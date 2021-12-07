@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+import torch
 from torch import nn
 from torch._C import _from_dlpack
 from torchvision.ops import MultiScaleRoIAlign
@@ -9,8 +10,12 @@ from modules.rpn import RegionProposalNetwork
 import torch.nn.functional as F
 from utils.roi_heads import RoIHeads
 from utils.transform import GeneralizedRCNNTransform
+import warnings
 
-class VoxelRCNN():
+from typing import List, Tuple, Optional
+from data_types.target import Target
+
+class VoxelRCNN(nn.Module):
     def __init__(self, backbone, num_classes=None,
                  # transform parameters
                  min_size=800, max_size=1333,
@@ -30,7 +35,9 @@ class VoxelRCNN():
                  box_batch_size_per_image=512, box_positive_fraction=0.25,
                  bbox_reg_weights=None,
                  # Mask parameters
-                 voxel_roi_pool=None, voxel_head=None, voxel_predictor=None):
+                 voxel_roi_pool=None, voxel_head=None, voxel_predictor=None,
+                 # Additional Params
+                 training: bool = True):
 
         assert isinstance(voxel_roi_pool, (MultiScaleRoIAlign, type(None)))
 
@@ -150,6 +157,7 @@ class VoxelRCNN():
             image_std = [0.229, 0.224, 0.225]
         transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
 
+        super().__init__()
         self.transform = transform
         self.backbone = backbone
         self.rpn = rpn
@@ -160,6 +168,100 @@ class VoxelRCNN():
         self.roi_heads.voxel_roi_pool = voxel_roi_pool
         self.roi_heads.voxel_head = voxel_head
         self.roi_heads.voxel_predictor = voxel_predictor
+
+    @torch.jit.unused
+    def eager_outputs(self, losses, detections):
+        # type: (Dict[str, Tensor], List[Dict[str, Tensor]]) -> Union[Dict[str, Tensor], List[Dict[str, Tensor]]]
+        print("Eager Outputs: ", losses, detections)
+        # TODO remove when working
+        self.training = True
+        if self.training:
+            return losses
+
+        return detections
+
+    def forward(self, images, targets: Optional[List[Target]] = None):
+        # type: (List[Tensor], Optional[List[Dict[str, Tensor]]]) -> Tuple[Dict[str, Tensor], List[Dict[str, Tensor]]]
+        """
+        Args:
+            images (list[Tensor]): images to be processed
+            targets (list[Dict[str, Tensor]]): ground-truth boxes present in the image (optional)
+        Returns:
+            result (list[BoxList] or dict[Tensor]): the output from the model.
+                During training, it returns a dict[Tensor] which contains the losses.
+                During testing, it returns list[BoxList] contains additional fields
+                like `scores`, `labels` and `mask` (for Mask R-CNN models).
+        """
+        # TODO: remove this when working
+        # targets = None
+        print("Initial Targets: ", targets)
+        print(type(targets[0]))
+        if self.training and targets is None:
+            raise ValueError("In training mode, targets should be passed")
+        if self.training:
+            assert targets is not None
+            for target in targets:
+                boxes = target["boxes"]
+                if isinstance(boxes, torch.Tensor):
+                    if len(boxes.shape) != 2 or boxes.shape[-1] != 4:
+                        raise ValueError(f"Expected target boxes to be a tensor of shape [N, 4], got {boxes.shape}.")
+                else:
+                    raise ValueError(f"Expected target boxes to be of type Tensor, got {type(boxes)}.")
+
+        original_image_sizes: List[Tuple[int, int]] = []
+        for img in images:
+            val = img.shape[-2:]
+            assert len(val) == 2
+            original_image_sizes.append((val[0], val[1]))
+
+        images, targets = self.transform(images, targets)
+
+        # Check for degenerate boxes
+        # TODO: Move this to a function
+        if targets is not None:
+            for target_idx, target in enumerate(targets):
+                boxes = target["boxes"]
+                degenerate_boxes = boxes[:, 2:] <= boxes[:, :2]
+                if degenerate_boxes.any():
+                    # print the first degenerate box
+                    bb_idx = torch.where(degenerate_boxes.any(dim=1))[0][0]
+                    degen_bb: List[float] = boxes[bb_idx].tolist()
+                    raise ValueError(
+                        "All bounding boxes should have positive height and width."
+                        f" Found invalid box {degen_bb} for target at index {target_idx}."
+                    )
+
+        features = self.backbone(images.tensors)
+        if isinstance(features, torch.Tensor):
+            features = OrderedDict([("0", features)])
+
+        print("Images: ", images)
+        proposals, proposal_losses = self.rpn(images, features, targets)
+        detections, detector_losses = self.roi_heads(features, proposals, images.image_sizes, targets)
+        print("Detections: ", detections)
+        detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)  # type: ignore[operator]
+        print("Proposals: ", proposals)
+        print("Transformed Detections: ", detections)
+        print("Proposal Losses: ", proposal_losses)
+        print("Detector Losses: ", detector_losses)
+
+        print("Final Detections")
+        losses = {}
+        losses.update(detector_losses)
+        losses.update(proposal_losses)
+        print("Final Losses", losses)
+
+        if torch.jit.is_scripting():
+            if not self._has_warned:
+                warnings.warn("RCNN always returns a (Losses, Detections) tuple in scripting")
+                self._has_warned = True
+            print("Returning losses")
+            return losses, detections
+        else:
+            print("Returning errors")
+            return self.eager_outputs(losses, detections)
+            # TODO remove this when working
+            # return losses, detections
 
 class VoxelRCNNHeads(nn.Sequential):
     def __init__(self, in_channels, layers, dilation):
@@ -182,8 +284,6 @@ class VoxelRCNNHeads(nn.Sequential):
         for name, param in self.named_parameters():
             if "weight" in name:
                 nn.init.kaiming_normal_(param, mode="fan_out", nonlinearity="relu")
-            # elif "bias" in name:
-            #     nn.init.constant_(param, 0)
 
 class VoxelRCNNPredictor(nn.Sequential):
     def __init__(self, in_channels, dim_reduced, num_classes):

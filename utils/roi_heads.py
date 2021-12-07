@@ -506,11 +506,13 @@ class RoIHeads(nn.Module):
         detections_per_img,
         # Mask
         voxel_roi_pool=None,
-        mask_head=None,
-        mask_predictor=None,
+        voxel_head=None,
+        voxel_predictor=None,
         keypoint_roi_pool=None,
         keypoint_head=None,
         keypoint_predictor=None,
+        # Additional Params
+        training: bool = True,
     ):
         super().__init__()
 
@@ -533,19 +535,20 @@ class RoIHeads(nn.Module):
         self.detections_per_img = detections_per_img
 
         self.voxel_roi_pool = voxel_roi_pool
-        self.mask_head = mask_head
-        self.mask_predictor = mask_predictor
+        self.voxel_head = voxel_head
+        self.voxel_predictor = voxel_predictor
 
         self.keypoint_roi_pool = keypoint_roi_pool
         self.keypoint_head = keypoint_head
         self.keypoint_predictor = keypoint_predictor
+        self.training = training
 
     def has_mask(self):
         if self.voxel_roi_pool is None:
             return False
-        if self.mask_head is None:
+        if self.voxel_head is None:
             return False
-        if self.mask_predictor is None:
+        if self.voxel_predictor is None:
             return False
         return True
 
@@ -736,6 +739,8 @@ class RoIHeads(nn.Module):
                 if self.has_keypoint():
                     assert t["keypoints"].dtype == torch.float32, "target keypoints must of float type"
 
+        # TODO remove when working
+        self.training = True
         if self.training:
             proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
         else:
@@ -750,6 +755,8 @@ class RoIHeads(nn.Module):
         result: List[Dict[str, torch.Tensor]] = []
         losses = {}
         if self.training:
+            print("Labels: ", labels)
+            print("Regression Targets: ", regression_targets)
             assert labels is not None and regression_targets is not None
             loss_classifier, loss_box_reg = fastrcnn_loss(class_logits, box_regression, labels, regression_targets)
             losses = {"loss_classifier": loss_classifier, "loss_box_reg": loss_box_reg}
@@ -764,10 +771,13 @@ class RoIHeads(nn.Module):
                         "scores": scores[i],
                     }
                 )
-
+        print("Has Mask: ", self.has_mask())
         if self.has_mask():
+            print("Boxes: ", result)
             mask_proposals = [p["boxes"] for p in result]
+            print("Mask Proposals: ", mask_proposals)
             if self.training:
+                print("Matched Idxs: ", matched_idxs)
                 assert matched_idxs is not None
                 # during training, only focus on positive boxes
                 num_images = len(proposals)
@@ -782,8 +792,8 @@ class RoIHeads(nn.Module):
 
             if self.voxel_roi_pool is not None:
                 mask_features = self.voxel_roi_pool(features, mask_proposals, image_shapes)
-                mask_features = self.mask_head(mask_features)
-                mask_logits = self.mask_predictor(mask_features)
+                mask_features = self.voxel_head(mask_features)
+                mask_logits = self.voxel_predictor(mask_features)
             else:
                 raise Exception("Expected voxel_roi_pool to be not None")
 
@@ -807,6 +817,10 @@ class RoIHeads(nn.Module):
 
         # keep none checks in if conditional so torchscript will conditionally
         # compile each branch
+        print("Has Keypoint_ROI_Pool: ", self.keypoint_roi_pool)
+        print("Has Keypoint_Head: ", self.keypoint_head)
+        print("Has Keypoint_Predictor: ", self.keypoint_predictor)
+        print("Keypoint Result: ", result)
         if (
             self.keypoint_roi_pool is not None
             and self.keypoint_head is not None
@@ -850,5 +864,7 @@ class RoIHeads(nn.Module):
                     r["keypoints_scores"] = kps
 
             losses.update(loss_keypoint)
+
+        print("Detection Result Boxes: ", result)
 
         return result, losses

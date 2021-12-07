@@ -128,6 +128,8 @@ class RegionProposalNetwork(torch.nn.Module):
         post_nms_top_n: Dict[str, int],
         nms_thresh: float,
         score_thresh: float = 0.0,
+        # Additional Params
+        training: bool = True,
     ) -> None:
         super().__init__()
         self.anchor_generator = anchor_generator
@@ -150,6 +152,7 @@ class RegionProposalNetwork(torch.nn.Module):
         self.nms_thresh = nms_thresh
         self.score_thresh = score_thresh
         self.min_size = 1e-3
+        self.training = training
 
     def pre_nms_top_n(self) -> int:
         if self.training:
@@ -348,7 +351,11 @@ class RegionProposalNetwork(torch.nn.Module):
         boxes, scores = self.filter_proposals(proposals, objectness, images.image_sizes, num_anchors_per_level)
 
         losses = {}
+        print("Training: ", self.training)
+        # TODO remove when working
+        self.training = True
         if self.training:
+            print("Targets: ", targets)
             assert targets is not None
             labels, matched_gt_boxes = self.assign_targets_to_anchors(anchors, targets)
             regression_targets = self.box_coder.encode(matched_gt_boxes, anchors)
