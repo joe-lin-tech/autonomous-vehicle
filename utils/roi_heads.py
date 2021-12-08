@@ -512,7 +512,7 @@ class RoIHeads(nn.Module):
         keypoint_head=None,
         keypoint_predictor=None,
         # Additional Params
-        training: bool = True,
+        # training: bool = True,
     ):
         super().__init__()
 
@@ -541,7 +541,7 @@ class RoIHeads(nn.Module):
         self.keypoint_roi_pool = keypoint_roi_pool
         self.keypoint_head = keypoint_head
         self.keypoint_predictor = keypoint_predictor
-        self.training = training
+        # self.training = training
 
     def has_mask(self):
         if self.voxel_roi_pool is None:
@@ -740,7 +740,7 @@ class RoIHeads(nn.Module):
                     assert t["keypoints"].dtype == torch.float32, "target keypoints must of float type"
 
         # TODO remove when working
-        self.training = True
+        # self.training = True
         if self.training:
             proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
         else:
@@ -755,8 +755,8 @@ class RoIHeads(nn.Module):
         result: List[Dict[str, torch.Tensor]] = []
         losses = {}
         if self.training:
-            print("Labels: ", labels)
-            print("Regression Targets: ", regression_targets)
+            # print("Labels: ", labels)
+            # print("Regression Targets: ", regression_targets)
             assert labels is not None and regression_targets is not None
             loss_classifier, loss_box_reg = fastrcnn_loss(class_logits, box_regression, labels, regression_targets)
             losses = {"loss_classifier": loss_classifier, "loss_box_reg": loss_box_reg}
@@ -771,13 +771,13 @@ class RoIHeads(nn.Module):
                         "scores": scores[i],
                     }
                 )
-        print("Has Mask: ", self.has_mask())
+        # print("Has Mask: ", self.has_mask())
         if self.has_mask():
-            print("Boxes: ", result)
+            # print("Boxes: ", result)
             mask_proposals = [p["boxes"] for p in result]
-            print("Mask Proposals: ", mask_proposals)
+            # print("Mask Proposals: ", mask_proposals)
             if self.training:
-                print("Matched Idxs: ", matched_idxs)
+                # print("Matched Idxs: ", matched_idxs)
                 assert matched_idxs is not None
                 # during training, only focus on positive boxes
                 num_images = len(proposals)
@@ -817,10 +817,10 @@ class RoIHeads(nn.Module):
 
         # keep none checks in if conditional so torchscript will conditionally
         # compile each branch
-        print("Has Keypoint_ROI_Pool: ", self.keypoint_roi_pool)
-        print("Has Keypoint_Head: ", self.keypoint_head)
-        print("Has Keypoint_Predictor: ", self.keypoint_predictor)
-        print("Keypoint Result: ", result)
+        # print("Has Keypoint_ROI_Pool: ", self.keypoint_roi_pool)
+        # print("Has Keypoint_Head: ", self.keypoint_head)
+        # print("Has Keypoint_Predictor: ", self.keypoint_predictor)
+        # print("Keypoint Result: ", result)
         if (
             self.keypoint_roi_pool is not None
             and self.keypoint_head is not None
@@ -865,6 +865,6 @@ class RoIHeads(nn.Module):
 
             losses.update(loss_keypoint)
 
-        print("Detection Result Boxes: ", result)
+        # print("Detection Result Boxes: ", result)
 
         return result, losses

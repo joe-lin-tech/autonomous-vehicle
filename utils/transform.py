@@ -413,12 +413,12 @@ class GeneralizedRCNNTransform(nn.Module):
             # TODO change back
             targets_copy: List[Target] = []
             # targets_copy: List[Dict[str, Tensor]] = []
-            print("Targets type: ", type(targets))
+            # print("Targets type: ", type(targets))
             for t in targets:
-                print("Data Type of t: ", type(t))
-                data: Target = {}
+                # print("Data Type of t: ", type(t))
                 # TODO change back
-                print("t: ", t)
+                data: Target = {}
+                # print("t: ", t)
                 for k, v in t._asdict().items():
                 # for k, v in t.items():
                     data[k] = v

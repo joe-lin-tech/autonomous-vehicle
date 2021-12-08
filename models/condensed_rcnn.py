@@ -15,7 +15,7 @@ import warnings
 from typing import List, Tuple, Optional
 from data_types.target import Target
 
-class VoxelRCNN(nn.Module):
+class CondensedRCNN(nn.Module):
     def __init__(self, backbone, num_classes=None,
                  # transform parameters
                  min_size=800, max_size=1333,
@@ -35,32 +35,32 @@ class VoxelRCNN(nn.Module):
                  box_batch_size_per_image=512, box_positive_fraction=0.25,
                  bbox_reg_weights=None,
                  # Mask parameters
-                 voxel_roi_pool=None, voxel_head=None, voxel_predictor=None):
+                 condensed_roi_pool=None, condensed_head=None, condensed_predictor=None):
 
-        assert isinstance(voxel_roi_pool, (MultiScaleRoIAlign, type(None)))
+        assert isinstance(condensed_roi_pool, (MultiScaleRoIAlign, type(None)))
 
         if num_classes is not None:
-            if voxel_predictor is not None:
+            if condensed_predictor is not None:
                 raise ValueError("num_classes should be None when mask_predictor is specified")
 
         out_channels = backbone.out_channels
 
-        if voxel_roi_pool is None:
-            voxel_roi_pool = MultiScaleRoIAlign(
+        if condensed_roi_pool is None:
+            condensed_roi_pool = MultiScaleRoIAlign(
                 featmap_names=['0', '1', '2', '3'],
                 output_size=14,
                 sampling_ratio=2)
 
-        if voxel_head is None:
+        if condensed_head is None:
             mask_layers = (256, 256, 256, 256)
             mask_dilation = 1
-            voxel_head = VoxelRCNNHeads(out_channels, mask_layers, mask_dilation)
+            condensed_head = CondensedRCNNHeads(out_channels, mask_layers, mask_dilation)
 
-        if voxel_predictor is None:
-            voxel_predictor_in_channels = 256  # == mask_layers[-1]
-            voxel_dim_reduced = 256
-            voxel_predictor = VoxelRCNNPredictor(voxel_predictor_in_channels,
-                                               voxel_dim_reduced, num_classes)
+        if condensed_predictor is None:
+            condensed_predictor_in_channels = 256  # == mask_layers[-1]
+            condensed_dim_reduced = 256
+            condensed_predictor = CondensedRCNNPredictor(condensed_predictor_in_channels,
+                                               condensed_dim_reduced, num_classes)
 
         if not hasattr(backbone, "out_channels"):
             raise ValueError(
@@ -143,9 +143,9 @@ class VoxelRCNN(nn.Module):
         # used only on torchscript mode
         self._has_warned = False
 
-        self.roi_heads.voxel_roi_pool = voxel_roi_pool
-        self.roi_heads.voxel_head = voxel_head
-        self.roi_heads.voxel_predictor = voxel_predictor
+        self.roi_heads.condensed_roi_pool = condensed_roi_pool
+        self.roi_heads.condensed_head = condensed_head
+        self.roi_heads.condensed_predictor = condensed_predictor
 
     @torch.jit.unused
     def eager_outputs(self, losses, detections):
@@ -220,7 +220,7 @@ class VoxelRCNN(nn.Module):
         else:
             return self.eager_outputs(losses, detections)
 
-class VoxelRCNNHeads(nn.Sequential):
+class CondensedRCNNHeads(nn.Sequential):
     def __init__(self, in_channels, layers, dilation):
         """
         Args:
@@ -237,14 +237,14 @@ class VoxelRCNNHeads(nn.Sequential):
             d["relu{}".format(layer_idx)] = nn.ReLU(inplace=True)
             next_feature = layer_features
 
-        super(VoxelRCNNHeads, self).__init__(d)
+        super(CondensedRCNNHeads, self).__init__(d)
         for name, param in self.named_parameters():
             if "weight" in name:
                 nn.init.kaiming_normal_(param, mode="fan_out", nonlinearity="relu")
 
-class VoxelRCNNPredictor(nn.Sequential):
+class CondensedRCNNPredictor(nn.Sequential):
     def __init__(self, in_channels, dim_reduced, num_classes):
-        super(VoxelRCNNPredictor, self).__init__(OrderedDict([
+        super(CondensedRCNNPredictor, self).__init__(OrderedDict([
             ("conv5_mask", nn.ConvTranspose2d(in_channels, dim_reduced, 2, 2, 0)),
             ("relu", nn.ReLU(inplace=True)),
             ("mask_fcn_logits", nn.Conv2d(dim_reduced, num_classes, 1, 1, 0)),

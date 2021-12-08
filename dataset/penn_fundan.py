@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 from PIL import Image
+from data_types.target import Target
 
 
 class PennFudanDataset(torch.utils.data.Dataset):
@@ -9,13 +10,17 @@ class PennFudanDataset(torch.utils.data.Dataset):
         self.transforms = transforms
         # load all image files, sorting them to
         # ensure that they are aligned
-        self.imgs = list(sorted(os.listdir(os.path.join(os.getcwd(), "dataset/PennFudanPed/PNGImages"))))
-        self.masks = list(sorted(os.listdir(os.path.join(os.getcwd(), "dataset/PennFudanPed/PedMasks"))))
+        self.imgs = list(sorted(os.listdir(os.path.join(
+            os.getcwd(), "dataset/PennFudanPed/PNGImages"))))
+        self.masks = list(sorted(os.listdir(os.path.join(
+            os.getcwd(), "dataset/PennFudanPed/PedMasks"))))
 
     def __getitem__(self, idx):
         # load images and masks
-        img_path = os.path.join(os.getcwd(), "dataset/PennFudanPed/PNGImages", self.imgs[idx])
-        mask_path = os.path.join(os.getcwd(), "dataset/PennFudanPed/PedMasks", self.masks[idx])
+        img_path = os.path.join(
+            os.getcwd(), "dataset/PennFudanPed/PNGImages", self.imgs[idx])
+        mask_path = os.path.join(
+            os.getcwd(), "dataset/PennFudanPed/PedMasks", self.masks[idx])
         img = Image.open(img_path).convert("RGB")
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance
@@ -63,8 +68,10 @@ class PennFudanDataset(torch.utils.data.Dataset):
         target["iscrowd"] = iscrowd
 
         if self.transforms is not None:
-            print("Transforms: ", self.transforms, type(self.transforms))
             img, target = self.transforms(img, target)
+
+        target = Target(boxes=target["boxes"], labels=target["labels"], masks=target["masks"],
+                        image_id=target["image_id"], area=target["area"], iscrowd=target["iscrowd"])
 
         return img, target
 

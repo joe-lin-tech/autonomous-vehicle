@@ -15,6 +15,8 @@ from collections import defaultdict, deque
 
 import torch
 import torch.distributed as dist
+import re
+from collections import defaultdict
 
 class BalancedPositiveNegativeSampler:
     """
@@ -493,9 +495,10 @@ def reduce_dict(input_dict, average=True):
 
 
 class MetricLogger:
-    def __init__(self, delimiter="\t"):
+    def __init__(self, delimiter="\t", writer=None):
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
+        self.writer = writer
 
     def update(self, **kwargs):
         for k, v in kwargs.items():
@@ -554,6 +557,13 @@ class MetricLogger:
             data_time.update(time.time() - end)
             yield obj
             iter_time.update(time.time() - end)
+
+            scalars = defaultdict()
+            for name, meter in self.meters.items():
+                scalars[name] = meter.value
+            print("Scalars: ", scalars)
+            self.writer.add_scalars("losses", scalars, int(re.findall(r"\d+", header)[0]) * 60 + i)
+
             if i % print_freq == 0 or i == len(iterable) - 1:
                 eta_seconds = iter_time.global_avg * (len(iterable) - i)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
@@ -596,7 +606,7 @@ def mkdir(path):
 
 def setup_for_distributed(is_master):
     """
-    This function disables printing when not in master process
+    This function disables # printing when not in master process
     """
     import builtins as __builtin__
 
@@ -648,7 +658,7 @@ def init_distributed_mode(args):
         args.rank = int(os.environ["SLURM_PROCID"])
         args.gpu = args.rank % torch.cuda.device_count()
     else:
-        print("Not using distributed mode")
+        # print("Not using distributed mode")
         args.distributed = False
         return
 
@@ -656,7 +666,7 @@ def init_distributed_mode(args):
 
     torch.cuda.set_device(args.gpu)
     args.dist_backend = "nccl"
-    print(f"| distributed init (rank {args.rank}): {args.dist_url}", flush=True)
+    # print(f"| distributed init (rank {args.rank}): {args.dist_url}", flush=True)
     torch.distributed.init_process_group(
         backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank
     )

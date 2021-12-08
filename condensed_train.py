@@ -3,7 +3,9 @@ from torch import nn, Tensor, tensor
 
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
-from models.voxel_rcnn import VoxelRCNN
+# from ..models.condensed_rcnn import CondensedRCNN
+# import ..models.condensed_rcnn as CondensedRCNN
+from models.condensed_rcnn import CondensedRCNN
 from utils.anchor_utils import AnchorGenerator
 from data_types.target import Target
 import torch.optim as optim
@@ -13,7 +15,7 @@ import utils._utils as utils
 from utils.engine import train_one_epoch, evaluate
 
 
-def main():
+def condensed_train():
     writer = SummaryWriter()
 
     backbone = torchvision.models.mobilenet_v2(pretrained=True).features
@@ -26,7 +28,7 @@ def main():
 
     roi_pooler = torchvision.ops.MultiScaleRoIAlign(
         featmap_names=['0'], output_size=7, sampling_ratio=2)
-    voxel_roi_pooler = torchvision.ops.MultiScaleRoIAlign(
+    condensed_roi_pooler = torchvision.ops.MultiScaleRoIAlign(
         featmap_names=['0'], output_size=14, sampling_ratio=2)
 
     # train on the GPU or on the CPU, if a GPU is not available
@@ -54,8 +56,8 @@ def main():
         collate_fn=utils.collate_fn)
 
     # get the model using our helper function
-    model = VoxelRCNN(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator,
-                      box_roi_pool=roi_pooler, voxel_roi_pool=voxel_roi_pooler)
+    model = CondensedRCNN(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator,
+                      box_roi_pool=roi_pooler, condensed_roi_pool=condensed_roi_pooler)
 
     # move model to the right device
     model.to(device)
@@ -91,4 +93,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    condensed_train()
