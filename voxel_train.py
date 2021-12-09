@@ -11,13 +11,19 @@ from dataset.penn_fundan import PennFudanDataset
 from utils.transform import get_transform
 import utils._utils as utils
 from utils.engine import train_one_epoch, evaluate
+from torchsummary import summary
 
 
-def main():
+def voxel_train():
     writer = SummaryWriter()
 
     backbone = torchvision.models.mobilenet_v2(pretrained=True).features
     backbone.out_channels = 1280
+
+    print("Backbone: ", backbone)
+    summary(backbone, (3, 224, 224))
+
+    
 
     anchor_generator = AnchorGenerator(
         sizes=((32, 64, 128, 256, 512),), aspect_ratios=((0.5, 1.0, 2.0),))
@@ -70,6 +76,7 @@ def main():
                                                    gamma=0.1)
 
     # let's train it for 10 epochs
+
     num_epochs = 10
 
     for epoch in range(num_epochs):
@@ -82,8 +89,6 @@ def main():
         evaluate(model, data_loader_test, device, epoch, writer=writer)
 
     # print("That's it!")
-
-    model.train()
     writer.flush()
 
     # writer.add_graph(model, (input, targets), use_strict_trace=True)
@@ -91,4 +96,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    voxel_train()

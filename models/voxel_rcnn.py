@@ -200,7 +200,9 @@ class VoxelRCNN(nn.Module):
                         f" Found invalid box {degen_bb} for target at index {target_idx}."
                     )
 
+        print("Image Tensors: ", images.tensors.shape)
         features = self.backbone(images.tensors)
+        print("Features: ", features.shape)
         if isinstance(features, torch.Tensor):
             features = OrderedDict([("0", features)])
 

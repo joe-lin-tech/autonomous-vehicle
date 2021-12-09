@@ -3,8 +3,6 @@ from torch import nn, Tensor, tensor
 
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
-# from ..models.condensed_rcnn import CondensedRCNN
-# import ..models.condensed_rcnn as CondensedRCNN
 from models.condensed_rcnn import CondensedRCNN
 from utils.anchor_utils import AnchorGenerator
 from data_types.target import Target
