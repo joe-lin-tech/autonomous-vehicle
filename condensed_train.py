@@ -11,6 +11,7 @@ from dataset.penn_fundan import PennFudanDataset
 from utils.transform import get_transform
 import utils._utils as utils
 from utils.engine import train_one_epoch, evaluate
+import json
 
 
 def condensed_train():
@@ -21,8 +22,6 @@ def condensed_train():
 
     anchor_generator = AnchorGenerator(
         sizes=((32, 64, 128, 256, 512),), aspect_ratios=((0.5, 1.0, 2.0),))
-
-    # backbone = Backbone(1280)
 
     roi_pooler = torchvision.ops.MultiScaleRoIAlign(
         featmap_names=['0'], output_size=7, sampling_ratio=2)
@@ -69,6 +68,19 @@ def condensed_train():
                                                    step_size=3,
                                                    gamma=0.1)
 
+    print("Writing Graph")
+    with open("sample.json", "r") as f:
+        sample_input = json.load(f)
+        images = [tensor(sample_input["Images"][0]),
+                  tensor(sample_input["Images"][1])]
+        targets = [Target(boxes=tensor(sample_input["Targets"][0]["boxes"]), labels=tensor(sample_input["Targets"][0]["labels"]),
+                          masks=tensor(sample_input["Targets"][0]["masks"]), image_id=tensor(sample_input["Targets"][0]["image_id"]),
+                          area=tensor(sample_input["Targets"][0]["area"]), iscrowd=tensor(sample_input["Targets"][0]["iscrowd"])),
+                   Target(boxes=tensor(sample_input["Targets"][1]["boxes"]), labels=tensor(sample_input["Targets"][1]["labels"]),
+                          masks=tensor(sample_input["Targets"][1]["masks"]), image_id=tensor(sample_input["Targets"][1]["image_id"]),
+                          area=tensor(sample_input["Targets"][1]["area"]), iscrowd=tensor(sample_input["Targets"][1]["iscrowd"]))]
+    writer.add_graph(model, (images, targets, torch.BoolTensor([True])), use_strict_trace=False)
+    print("Graph Finished")
     # let's train it for 10 epochs
     num_epochs = 10
 
@@ -81,13 +93,8 @@ def condensed_train():
         # evaluate on the test dataset
         evaluate(model, data_loader_test, device, epoch, writer=writer)
 
-    # print("That's it!")
-
     model.train()
     writer.flush()
-
-    # writer.add_graph(model, (input, targets), use_strict_trace=True)
-    # writer.close()
 
 
 if __name__ == '__main__':

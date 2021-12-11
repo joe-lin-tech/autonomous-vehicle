@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 import torch
-from torch import nn
+from torch import nn, Tensor
 from torch._C import _from_dlpack
 from torchvision.ops import MultiScaleRoIAlign
 from utils.anchor_utils import AnchorGenerator
@@ -148,13 +148,16 @@ class CondensedRCNN(nn.Module):
         self.roi_heads.condensed_predictor = condensed_predictor
 
     @torch.jit.unused
-    def eager_outputs(self, losses, detections):
+    def eager_outputs(self, losses, detections, write_graph):
+        if write_graph:
+            return Tensor([list(losses.items())])
+
         if self.training:
             return losses
 
         return detections
 
-    def forward(self, images, targets: Optional[List[Target]] = None):
+    def forward(self, images, targets: Optional[List[Target]] = None, write_graph: Tensor = torch.BoolTensor([False])):
         """
         Args:
             images (list[Tensor]): images to be processed
@@ -165,6 +168,10 @@ class CondensedRCNN(nn.Module):
                 During testing, it returns list[BoxList] contains additional fields
                 like `scores`, `labels` and `mask` (for Mask R-CNN models).
         """
+        if not isinstance(targets[0], Target):
+            for i, t in enumerate(targets):
+                targets[i] = Target(boxes=t[0], labels=t[1], masks=t[2],
+                                    image_id=t[3], area=t[4], iscrowd=t[5])
         if self.training and targets is None:
             raise ValueError("In training mode, targets should be passed")
         if self.training:
@@ -218,7 +225,7 @@ class CondensedRCNN(nn.Module):
                 self._has_warned = True
             return losses, detections
         else:
-            return self.eager_outputs(losses, detections)
+            return self.eager_outputs(losses, detections, write_graph=write_graph)
 
 class CondensedRCNNHeads(nn.Sequential):
     def __init__(self, in_channels, layers, dilation):

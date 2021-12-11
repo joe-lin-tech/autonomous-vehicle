@@ -410,17 +410,14 @@ class GeneralizedRCNNTransform(nn.Module):
             # once torchscript supports dict comprehension
             # this can be simplified as follows
             # targets = [{k: v for k,v in t.items()} for t in targets]
-            # TODO change back
             targets_copy: List[Target] = []
-            # targets_copy: List[Dict[str, Tensor]] = []
-            # print("Targets type: ", type(targets))
             for t in targets:
-                # print("Data Type of t: ", type(t))
-                # TODO change back
                 data: Target = {}
-                # print("t: ", t)
+                # TODO change back
+                # if not isinstance(t, Target):
+                #     t = Target(boxes=t[0], labels=t[1], masks=t[2],
+                #         image_id=t[3], area=t[4], iscrowd=t[5])
                 for k, v in t._asdict().items():
-                # for k, v in t.items():
                     data[k] = v
                 targets_copy.append(data)
             targets = targets_copy

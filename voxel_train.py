@@ -7,11 +7,12 @@ from models.voxel_rcnn import VoxelRCNN
 from utils.anchor_utils import AnchorGenerator
 from data_types.target import Target
 import torch.optim as optim
-from dataset.penn_fundan import PennFudanDataset
+from dataset.nuScenes_radar import nuScenesDataset 
 from utils.transform import get_transform
 import utils._utils as utils
 from utils.engine import train_one_epoch, evaluate
 from torchsummary import summary
+import json
 
 
 def voxel_train():
@@ -20,10 +21,7 @@ def voxel_train():
     backbone = torchvision.models.mobilenet_v2(pretrained=True).features
     backbone.out_channels = 1280
 
-    print("Backbone: ", backbone)
-    summary(backbone, (3, 224, 224))
-
-    
+    # summary(backbone, (3, 224, 224))
 
     anchor_generator = AnchorGenerator(
         sizes=((32, 64, 128, 256, 512),), aspect_ratios=((0.5, 1.0, 2.0),))
@@ -42,13 +40,13 @@ def voxel_train():
     # our dataset has two classes only - background and person
     num_classes = 2
     # use our dataset and defined transformations
-    dataset = PennFudanDataset(get_transform(train=True))
-    dataset_test = PennFudanDataset(get_transform(train=False))
+    dataset = nuScenesDataset(get_transform(train=True))
+    dataset_test = nuScenesDataset(get_transform(train=False))
 
     # split the dataset in train and test set
     indices = torch.randperm(len(dataset)).tolist()
-    dataset = torch.utils.data.Subset(dataset, indices[:-50])
-    dataset_test = torch.utils.data.Subset(dataset_test, indices[-50:])
+    dataset = torch.utils.data.Subset(dataset, indices[:-5])
+    dataset_test = torch.utils.data.Subset(dataset_test, indices[-5:])
 
     # define training and validation data loaders
     data_loader = torch.utils.data.DataLoader(
@@ -75,8 +73,21 @@ def voxel_train():
                                                    step_size=3,
                                                    gamma=0.1)
 
-    # let's train it for 10 epochs
+    # print("Writing Graph")
+    # with open("sample.json", "r") as f:
+    #     sample_input = json.load(f)
+    #     images = [tensor(sample_input["Images"][0]),
+    #               tensor(sample_input["Images"][1])]
+    #     targets = [Target(boxes=tensor(sample_input["Targets"][0]["boxes"]), labels=tensor(sample_input["Targets"][0]["labels"]),
+    #                       masks=tensor(sample_input["Targets"][0]["masks"]), image_id=tensor(sample_input["Targets"][0]["image_id"]),
+    #                       area=tensor(sample_input["Targets"][0]["area"]), iscrowd=tensor(sample_input["Targets"][0]["iscrowd"])),
+    #                Target(boxes=tensor(sample_input["Targets"][1]["boxes"]), labels=tensor(sample_input["Targets"][1]["labels"]),
+    #                       masks=tensor(sample_input["Targets"][1]["masks"]), image_id=tensor(sample_input["Targets"][1]["image_id"]),
+    #                       area=tensor(sample_input["Targets"][1]["area"]), iscrowd=tensor(sample_input["Targets"][1]["iscrowd"]))]
+    # writer.add_graph(model, (images, targets, torch.BoolTensor([True])), use_strict_trace=False)
+    # print("Graph Finished")
 
+    # let's train it for 10 epochs
     num_epochs = 10
 
     for epoch in range(num_epochs):
@@ -88,11 +99,7 @@ def voxel_train():
         # evaluate on the test dataset
         evaluate(model, data_loader_test, device, epoch, writer=writer)
 
-    # print("That's it!")
     writer.flush()
-
-    # writer.add_graph(model, (input, targets), use_strict_trace=True)
-    # writer.close()
 
 
 if __name__ == '__main__':

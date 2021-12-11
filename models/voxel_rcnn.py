@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 import torch
-from torch import nn
+from torch import nn, Tensor
 from torch._C import _from_dlpack
 from torchvision.ops import MultiScaleRoIAlign
 from utils.anchor_utils import AnchorGenerator
@@ -14,6 +14,7 @@ import warnings
 
 from typing import List, Tuple, Optional
 from data_types.target import Target
+
 
 class VoxelRCNN(nn.Module):
     def __init__(self, backbone, num_classes=None,
@@ -41,7 +42,8 @@ class VoxelRCNN(nn.Module):
 
         if num_classes is not None:
             if voxel_predictor is not None:
-                raise ValueError("num_classes should be None when mask_predictor is specified")
+                raise ValueError(
+                    "num_classes should be None when mask_predictor is specified")
 
         out_channels = backbone.out_channels
 
@@ -54,13 +56,14 @@ class VoxelRCNN(nn.Module):
         if voxel_head is None:
             mask_layers = (256, 256, 256, 256)
             mask_dilation = 1
-            voxel_head = VoxelRCNNHeads(out_channels, mask_layers, mask_dilation)
+            voxel_head = VoxelRCNNHeads(
+                out_channels, mask_layers, mask_dilation)
 
         if voxel_predictor is None:
             voxel_predictor_in_channels = 256  # == mask_layers[-1]
             voxel_dim_reduced = 256
             voxel_predictor = VoxelRCNNPredictor(voxel_predictor_in_channels,
-                                               voxel_dim_reduced, num_classes)
+                                                 voxel_dim_reduced, num_classes)
 
         if not hasattr(backbone, "out_channels"):
             raise ValueError(
@@ -73,7 +76,8 @@ class VoxelRCNN(nn.Module):
 
         if num_classes is not None:
             if box_predictor is not None:
-                raise ValueError("num_classes should be None when box_predictor is specified")
+                raise ValueError(
+                    "num_classes should be None when box_predictor is specified")
         else:
             if box_predictor is None:
                 raise ValueError("num_classes should not be None when box_predictor "
@@ -89,11 +93,14 @@ class VoxelRCNN(nn.Module):
             )
         if rpn_head is None:
             rpn_head = RPNHead(
-                out_channels, rpn_anchor_generator.num_anchors_per_location()[0]
+                out_channels, rpn_anchor_generator.num_anchors_per_location()[
+                    0]
             )
 
-        rpn_pre_nms_top_n = dict(training=rpn_pre_nms_top_n_train, testing=rpn_pre_nms_top_n_test)
-        rpn_post_nms_top_n = dict(training=rpn_post_nms_top_n_train, testing=rpn_post_nms_top_n_test)
+        rpn_pre_nms_top_n = dict(
+            training=rpn_pre_nms_top_n_train, testing=rpn_pre_nms_top_n_test)
+        rpn_post_nms_top_n = dict(
+            training=rpn_post_nms_top_n_train, testing=rpn_post_nms_top_n_test)
 
         rpn = RegionProposalNetwork(
             rpn_anchor_generator, rpn_head,
@@ -133,7 +140,8 @@ class VoxelRCNN(nn.Module):
             image_mean = [0.485, 0.456, 0.406]
         if image_std is None:
             image_std = [0.229, 0.224, 0.225]
-        transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
+        transform = GeneralizedRCNNTransform(
+            min_size, max_size, image_mean, image_std)
 
         super().__init__()
         self.transform = transform
@@ -148,13 +156,17 @@ class VoxelRCNN(nn.Module):
         self.roi_heads.voxel_predictor = voxel_predictor
 
     @torch.jit.unused
-    def eager_outputs(self, losses, detections):
+    def eager_outputs(self, losses, detections, write_graph):
+        print("Eager Outputs: ", losses, type(losses))
+        if write_graph:
+            return Tensor([list(losses.items())])
+
         if self.training:
             return losses
 
         return detections
 
-    def forward(self, images, targets: Optional[List[Target]] = None):
+    def forward(self, images, targets: Optional[List[Target]] = None, write_graph: Tensor = torch.BoolTensor([False])):
         """
         Args:
             images (list[Tensor]): images to be processed
@@ -165,6 +177,11 @@ class VoxelRCNN(nn.Module):
                 During testing, it returns list[BoxList] contains additional fields
                 like `scores`, `labels` and `mask` (for Mask R-CNN models).
         """
+        # TODO remove when working
+        if not isinstance(targets[0], Target):
+            for i, t in enumerate(targets):
+                targets[i] = Target(boxes=t[0], labels=t[1], masks=t[2],
+                                    image_id=t[3], area=t[4], iscrowd=t[5])
         if self.training and targets is None:
             raise ValueError("In training mode, targets should be passed")
         if self.training:
@@ -173,9 +190,11 @@ class VoxelRCNN(nn.Module):
                 boxes = target.boxes
                 if isinstance(boxes, torch.Tensor):
                     if len(boxes.shape) != 2 or boxes.shape[-1] != 4:
-                        raise ValueError(f"Expected target boxes to be a tensor of shape [N, 4], got {boxes.shape}.")
+                        raise ValueError(
+                            f"Expected target boxes to be a tensor of shape [N, 4], got {boxes.shape}.")
                 else:
-                    raise ValueError(f"Expected target boxes to be of type Tensor, got {type(boxes)}.")
+                    raise ValueError(
+                        f"Expected target boxes to be of type Tensor, got {type(boxes)}.")
 
         original_image_sizes: List[Tuple[int, int]] = []
         for img in images:
@@ -200,27 +219,32 @@ class VoxelRCNN(nn.Module):
                         f" Found invalid box {degen_bb} for target at index {target_idx}."
                     )
 
-        print("Image Tensors: ", images.tensors.shape)
         features = self.backbone(images.tensors)
-        print("Features: ", features.shape)
         if isinstance(features, torch.Tensor):
             features = OrderedDict([("0", features)])
 
         proposals, proposal_losses = self.rpn(images, features, targets)
-        detections, detector_losses = self.roi_heads(features, proposals, images.image_sizes, targets)
-        detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)  # type: ignore[operator]
+        detections, detector_losses = self.roi_heads(
+            features, proposals, images.image_sizes, targets)
+        detections = self.transform.postprocess(
+            detections, images.image_sizes, original_image_sizes)  # type: ignore[operator]
 
         losses = {}
         losses.update(detector_losses)
         losses.update(proposal_losses)
 
+        print("Detector Losses: ", detector_losses)
+        print("Proposal Losses: ", proposal_losses)
+
         if torch.jit.is_scripting():
             if not self._has_warned:
-                warnings.warn("RCNN always returns a (Losses, Detections) tuple in scripting")
+                warnings.warn(
+                    "RCNN always returns a (Losses, Detections) tuple in scripting")
                 self._has_warned = True
             return losses, detections
         else:
-            return self.eager_outputs(losses, detections)
+            return self.eager_outputs(losses, detections, write_graph=write_graph)
+
 
 class VoxelRCNNHeads(nn.Sequential):
     def __init__(self, in_channels, layers, dilation):
@@ -242,7 +266,9 @@ class VoxelRCNNHeads(nn.Sequential):
         super(VoxelRCNNHeads, self).__init__(d)
         for name, param in self.named_parameters():
             if "weight" in name:
-                nn.init.kaiming_normal_(param, mode="fan_out", nonlinearity="relu")
+                nn.init.kaiming_normal_(
+                    param, mode="fan_out", nonlinearity="relu")
+
 
 class VoxelRCNNPredictor(nn.Sequential):
     def __init__(self, in_channels, dim_reduced, num_classes):
@@ -254,7 +280,9 @@ class VoxelRCNNPredictor(nn.Sequential):
 
         for name, param in self.named_parameters():
             if "weight" in name:
-                nn.init.kaiming_normal_(param, mode="fan_out", nonlinearity="relu")
+                nn.init.kaiming_normal_(
+                    param, mode="fan_out", nonlinearity="relu")
+
 
 class TwoMLPHead(nn.Module):
     """
@@ -279,6 +307,7 @@ class TwoMLPHead(nn.Module):
 
         return x
 
+
 class FastRCNNPredictor(nn.Module):
     """
     Standard classification + bounding box regression layers
@@ -302,4 +331,3 @@ class FastRCNNPredictor(nn.Module):
         bbox_deltas = self.bbox_pred(x)
 
         return scores, bbox_deltas
-

@@ -5,6 +5,7 @@ import torch
 from torch import nn, Tensor
 
 from modules.image_list import ImageList
+from modules.frame_list import FrameList
 
 
 class AnchorGenerator(nn.Module):

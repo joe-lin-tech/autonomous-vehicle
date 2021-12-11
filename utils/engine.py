@@ -9,6 +9,8 @@ from utils.coco_eval import CocoEvaluator
 from utils.coco_utils import get_coco_api_from_dataset
 from data_types.target import Target
 
+import json
+
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, scaler=None, writer=None):
     model.train()
@@ -30,15 +32,15 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
 
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
         images = list(image.to(device) for image in images)
-        # TODO change back
-        # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        # print("# printing targets: ", targets)
         targets = [{k: v.to(device) for k, v in t._asdict().items()}
                    for t in targets]
         targets = [Target(boxes=t["boxes"], labels=t["labels"], masks=t["masks"],
                           image_id=t["image_id"], area=t["area"], iscrowd=t["iscrowd"]) for t in targets]
-        # print("Final Engine Targets: ", targets, type(targets), len(targets), type(targets[0]))
         with torch.cuda.amp.autocast(enabled=scaler is not None):
+            # TODO remove this
+            # with open("sample.json", "w") as f:
+            #     json.dump(dict({"Images": [images[0].numpy().tolist(), images[1].numpy().tolist()], "Targets": [{k: v.numpy().tolist() for k, v in targets[0]._asdict().items()}, {k: v.numpy().tolist() for k, v in targets[1]._asdict().items()}]}), f)
+            #
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
 
