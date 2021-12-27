@@ -175,6 +175,8 @@ class BoxCoder:
             box_sum += val
         if box_sum > 0:
             rel_codes = rel_codes.reshape(box_sum, -1)
+        print("REL_CODES: ", rel_codes.shape)
+        print("CONCAT BOXES: ", concat_boxes.shape)
         pred_boxes = self.decode_single(rel_codes, concat_boxes)
         if box_sum > 0:
             pred_boxes = pred_boxes.reshape(box_sum, -1, 4)
@@ -197,6 +199,7 @@ class BoxCoder:
         ctr_y = boxes[:, 1] + 0.5 * heights
 
         wx, wy, ww, wh = self.weights
+        print("REL CODES: ", rel_codes)
         dx = rel_codes[:, 0::4] / wx
         dy = rel_codes[:, 1::4] / wy
         dw = rel_codes[:, 2::4] / ww
@@ -220,6 +223,7 @@ class BoxCoder:
         pred_boxes3 = pred_ctr_x + c_to_c_w
         pred_boxes4 = pred_ctr_y + c_to_c_h
         pred_boxes = torch.stack((pred_boxes1, pred_boxes2, pred_boxes3, pred_boxes4), dim=2).flatten(1)
+        print("PRED_BOXES :", pred_boxes.shape)
         return pred_boxes
 
 

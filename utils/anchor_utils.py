@@ -5,7 +5,6 @@ import torch
 from torch import nn, Tensor
 
 from modules.image_list import ImageList
-from modules.frame_list import FrameList
 
 
 class AnchorGenerator(nn.Module):
@@ -72,14 +71,18 @@ class AnchorGenerator(nn.Module):
 
         ws = (w_ratios[:, None] * scales[None, :]).view(-1)
         hs = (h_ratios[:, None] * scales[None, :]).view(-1)
+        print("Ws: ", ws)
+        print("Hs: ", hs)
 
         base_anchors = torch.stack([-ws, -hs, ws, hs], dim=1) / 2
+        print("BASE ANCHORS: ", base_anchors, base_anchors.shape)
         return base_anchors.round()
 
     def set_cell_anchors(self, dtype: torch.dtype, device: torch.device):
         self.cell_anchors = [cell_anchor.to(dtype=dtype, device=device) for cell_anchor in self.cell_anchors]
 
     def num_anchors_per_location(self):
+        print([len(s) * len(a) for s, a in zip(self.sizes, self.aspect_ratios)])
         return [len(s) * len(a) for s, a in zip(self.sizes, self.aspect_ratios)]
 
     # For every combination of (a, (g, s), i) in (self.cell_anchors, zip(grid_sizes, strides), 0:2),
@@ -112,8 +115,10 @@ class AnchorGenerator(nn.Module):
 
             # For every (base anchor, output anchor) pair,
             # offset each zero-centered base anchor by the center of the output anchor.
+            print("BASE: ", base_anchors.view(1, -1, 4))
+            print("SHIFTS: ", shifts.view(-1, 1, 4))
             anchors.append((shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4))
-
+        print(anchors)
         return anchors
 
     def forward(self, image_list: ImageList, feature_maps: List[Tensor]) -> List[Tensor]:
@@ -134,6 +139,7 @@ class AnchorGenerator(nn.Module):
             anchors_in_image = [anchors_per_feature_map for anchors_per_feature_map in anchors_over_all_feature_maps]
             anchors.append(anchors_in_image)
         anchors = [torch.cat(anchors_per_image) for anchors_per_image in anchors]
+        print("FINAL ANCHORS: ", anchors)
         return anchors
 
 

@@ -748,9 +748,14 @@ class RoIHeads(nn.Module):
             regression_targets = None
             matched_idxs = None
 
+        print("FEATURES: ", features, features["0"].shape)
         box_features = self.box_roi_pool(features, proposals, image_shapes)
+        print("BOX_FEATURES: ", box_features.shape)
         box_features = self.box_head(box_features)
+        print("BOX_FEATURES AFTER BOX_HEAD: ", box_features.shape)
         class_logits, box_regression = self.box_predictor(box_features)
+        print("CLASS_LOGITS: ", class_logits.shape)
+        print("BOX_REGRESSION: ", box_regression.shape)
 
         result: List[Dict[str, torch.Tensor]] = []
         losses = {}

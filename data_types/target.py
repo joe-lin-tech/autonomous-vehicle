@@ -8,3 +8,9 @@ class Target(NamedTuple):
     image_id: Tensor
     area: Tensor
     iscrowd: Tensor
+
+class VoxelTarget(NamedTuple):
+    boxes: Tensor
+    labels: Tensor
+    frame_id: Tensor
+    volume: Tensor

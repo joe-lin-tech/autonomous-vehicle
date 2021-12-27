@@ -4,34 +4,30 @@ from torch import nn, Tensor, tensor
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from models.voxel_rcnn import VoxelRCNN
-from utils.anchor_utils import AnchorGenerator
+from utils.voxel.anchor_utils import AnchorGenerator
 from data_types.target import Target
 import torch.optim as optim
-from dataset.nuScenes_radar import nuScenesDataset 
-from utils.transform import get_transform
+# from dataset.nuScenes_radar import nuScenesDataset 
+from dataset.zadar_radar import ZadarLabsDataset
 import utils._utils as utils
-from utils.engine import train_one_epoch, evaluate
+from utils.voxel.engine import train_one_epoch, evaluate
 from torchsummary import summary
+from modules.voxel_backbone import VoxelBackbone
 import json
 
 
 def voxel_train():
     writer = SummaryWriter()
 
-    backbone = torchvision.models.mobilenet_v2(pretrained=True).features
-    backbone.out_channels = 1280
+    # backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+    # backbone.out_channels = 1280
+    backbone = VoxelBackbone()
+    backbone.out_channels = 1536
 
-    # summary(backbone, (3, 224, 224))
+    anchor_generator = AnchorGenerator()
 
-    anchor_generator = AnchorGenerator(
-        sizes=((32, 64, 128, 256, 512),), aspect_ratios=((0.5, 1.0, 2.0),))
-
-    # backbone = Backbone(1280)
-
-    roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-        featmap_names=['0'], output_size=7, sampling_ratio=2)
-    voxel_roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-        featmap_names=['0'], output_size=14, sampling_ratio=2)
+    # roi_pooler = torchvision.ops.MultiScaleRoIAlign(
+    #     featmap_names=['0'], output_size=7, sampling_ratio=2)
 
     # train on the GPU or on the CPU, if a GPU is not available
     device = torch.device(
@@ -40,13 +36,13 @@ def voxel_train():
     # our dataset has two classes only - background and person
     num_classes = 2
     # use our dataset and defined transformations
-    dataset = nuScenesDataset(get_transform(train=True))
-    dataset_test = nuScenesDataset(get_transform(train=False))
+    dataset = ZadarLabsDataset()
+    dataset_test = ZadarLabsDataset()
 
     # split the dataset in train and test set
     indices = torch.randperm(len(dataset)).tolist()
-    dataset = torch.utils.data.Subset(dataset, indices[:-5])
-    dataset_test = torch.utils.data.Subset(dataset_test, indices[-5:])
+    dataset = torch.utils.data.Subset(dataset, indices[:-30])
+    dataset_test = torch.utils.data.Subset(dataset_test, indices[-30:])
 
     # define training and validation data loaders
     data_loader = torch.utils.data.DataLoader(
@@ -58,8 +54,8 @@ def voxel_train():
         collate_fn=utils.collate_fn)
 
     # get the model using our helper function
-    model = VoxelRCNN(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator,
-                      box_roi_pool=roi_pooler, voxel_roi_pool=voxel_roi_pooler)
+    model = VoxelRCNN(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
+                    #   box_roi_pool=roi_pooler)
 
     # move model to the right device
     model.to(device)

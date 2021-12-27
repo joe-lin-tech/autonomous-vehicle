@@ -5,3 +5,5 @@ utils/__pycache__
 runs
 dataset/PennFudanPed
 dataset/nuScenesDataset
+dataset/ZadarLabsDataset
+configs
