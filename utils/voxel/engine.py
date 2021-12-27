@@ -3,15 +3,11 @@ import sys
 import time
 
 import torch
-import torchvision.models.detection.mask_rcnn
-import utils._utils as utils
-from utils.coco_eval import CocoEvaluator
-from utils.coco_utils import get_coco_api_from_dataset
+import utils.voxel._utils as utils
 from data_types.target import VoxelTarget
 from torch import tensor
 from configs.config import T
 
-import json
 import numpy as np
 
 
@@ -36,7 +32,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
     # print("Initial Metric Logger: ", metric_logger)
 
     for frames, targets in metric_logger.log_every(data_loader, print_freq, header):
-        # frames = list((voxel_features.to(device), voxel_coords.to(device)) for voxel_features, voxel_coords in frames)
         voxel_features = [frame[0] for frame in frames]
         voxel_coords = [frame[1] for frame in frames]
         max_points = max(list(map(len, voxel_features)))
@@ -93,18 +88,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
     return metric_logger
 
 
-def _get_iou_types(model):
-    model_without_ddp = model
-    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-        model_without_ddp = model.module
-    iou_types = ["bbox"]
-    if isinstance(model_without_ddp, torchvision.models.detection.MaskRCNN):
-        iou_types.append("segm")
-    if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
-        iou_types.append("keypoints")
-    return iou_types
-
-
+# TODO fix evaluation method
 @torch.inference_mode()
 def evaluate(model, data_loader, device, epoch, writer=None):
     n_threads = torch.get_num_threads()

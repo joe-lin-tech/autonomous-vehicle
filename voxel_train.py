@@ -9,7 +9,7 @@ from data_types.target import Target
 import torch.optim as optim
 # from dataset.nuScenes_radar import nuScenesDataset 
 from dataset.zadar_radar import ZadarLabsDataset
-import utils._utils as utils
+import utils.voxel._utils as utils
 from utils.voxel.engine import train_one_epoch, evaluate
 from torchsummary import summary
 from modules.voxel_backbone import VoxelBackbone

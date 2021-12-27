@@ -1,7 +1,4 @@
-from typing import List, Optional, Dict, Tuple, cast
-
 import torch
-import torchvision
 from torch import nn, Tensor, tensor
 from torch.nn import functional as F
 from torchvision.ops import boxes as box_ops
@@ -82,17 +79,6 @@ class StackedVFE(nn.Module):
 class ConvolutionalMiddleLayer(nn.Module):
     def __init__(self):
         super(ConvolutionalMiddleLayer, self).__init__()
-        # self.conv_layers = nn.Sequential(
-        #     Conv3d(128, 64, 3, s=(2, 1, 1), p=(1, 1, 1)),
-        #     nn.BatchNorm3d(64),
-        #     nn.ReLU(inplace=True),
-        #     Conv3d(64, 64, 3, s=(1, 1, 1), p=(0, 1, 1)),
-        #     nn.BatchNorm3d(64),
-        #     nn.ReLU(inplace=True),
-        #     Conv3d(64, 64, 3, s=(2, 1, 1), p=(1, 1, 1)),
-        #     nn.BatchNorm3d(64),
-        #     nn.ReLU(inplace=True),
-        # )
         self.conv_layers = nn.Sequential(
             Conv3d(128, 64, 3, s=(3, 1, 1), p=(1, 1, 1)),
             nn.BatchNorm3d(64),
@@ -139,15 +125,10 @@ class VoxelBackbone(torch.nn.Module):
     def forward(self, pointclouds):
         voxel_features, voxel_coords = pointclouds
         # feature learning network
-        print("voxel_features: ", voxel_features.shape)
-        print("voxel_coords: ", voxel_coords.shape)
         vwfs = self.svfe(voxel_features)
-        print("VWFS: ", vwfs.shape)
         vwfs = self.voxel_indexing(vwfs, voxel_coords)
-        print("VWFS AFTER INDEXING: ", vwfs.shape)
 
         # convolutional middle network
         cml_out = self.cml(vwfs)
-        print("CML: ", cml_out.shape)
 
         return cml_out.view(2, -1, D, W)

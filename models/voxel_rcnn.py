@@ -7,7 +7,6 @@ from torchvision.ops import MultiScaleRoIAlign
 from utils.voxel.anchor_utils import AnchorGenerator
 from modules.voxel_rpn import RPNHead, RegionProposalNetwork
 import torch.nn.functional as F
-from utils.voxel.roi_heads import RoIHeads
 import warnings
 
 from typing import List, Tuple, Optional
@@ -82,19 +81,9 @@ class VoxelRCNN(nn.Module):
                 representation_size,
                 num_classes)
 
-        roi_heads = RoIHeads(
-            # Box
-            # box_roi_pool,
-            box_head, box_predictor,
-            box_fg_iou_thresh, box_bg_iou_thresh,
-            box_batch_size_per_frame, box_positive_fraction,
-            bbox_reg_weights,
-            box_score_thresh, box_nms_thresh, box_detections_per_frame)
-
         super().__init__()
         self.backbone = backbone
         self.rpn = rpn
-        self.roi_heads = roi_heads
         # used only on torchscript mode
         self._has_warned = False
 
