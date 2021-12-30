@@ -6,7 +6,6 @@ import torch
 import torchvision
 from torch import nn, Tensor
 
-from modules.image_list import ImageList
 from utils.roi_heads import paste_masks_in_image
 
 from data_types.target import Target

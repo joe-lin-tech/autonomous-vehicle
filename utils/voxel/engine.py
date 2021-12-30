@@ -54,8 +54,9 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         targets = [VoxelTarget(boxes=t["boxes"], labels=t["labels"],
                                frame_id=t["frame_id"], volume=t["volume"]) for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            loss_dict = model(frames, targets)
+            loss_dict, detections = model(frames, targets)
             losses = sum(loss for loss in loss_dict.values())
+        print("DETECTIONS: ", detections)
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)

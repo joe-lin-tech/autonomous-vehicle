@@ -94,7 +94,7 @@ class VoxelRCNN(nn.Module):
             return Tensor([list(losses.items())])
 
         if self.training:
-            return losses
+            return losses, detections
 
         return detections
 
@@ -153,7 +153,7 @@ class VoxelRCNN(nn.Module):
             return losses
         else:
             # return self.eager_outputs(losses, detections, write_graph=write_graph)
-            return self.eager_outputs(losses, None, write_graph=write_graph)
+            return self.eager_outputs(losses, proposals, write_graph=write_graph)
 
 
 class VoxelRCNNHeads(nn.Sequential):
@@ -210,7 +210,6 @@ class TwoMLPHead(nn.Module):
         self.fc7 = nn.Linear(representation_size, representation_size)
 
     def forward(self, x):
-        # x = x.flatten(start_dim=1)
         x = x.flatten(start_dim=2)
 
         x = F.relu(self.fc6(x))
@@ -235,8 +234,6 @@ class FastRCNNPredictor(nn.Module):
         self.bbox_pred = nn.Linear(in_channels, num_classes * 9)
 
     def forward(self, x):
-        print("X DIM: ", x.dim())
-        # x = x.flatten(start_dim=1)
         scores = self.cls_score(x)
         bbox_deltas = self.bbox_pred(x)
 

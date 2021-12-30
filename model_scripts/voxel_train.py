@@ -3,7 +3,7 @@ from torch import nn, Tensor, tensor
 
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
-from models.voxel_rcnn import VoxelRCNN
+from model.voxel_rcnn import VoxelRCNN
 from utils.voxel.anchor_utils import AnchorGenerator
 from data_types.target import Target
 import torch.optim as optim
@@ -13,21 +13,14 @@ import utils.voxel._utils as utils
 from utils.voxel.engine import train_one_epoch, evaluate
 from torchsummary import summary
 from modules.voxel_backbone import VoxelBackbone
-import json
 
 
 def voxel_train():
     writer = SummaryWriter()
-
-    # backbone = torchvision.models.mobilenet_v2(pretrained=True).features
-    # backbone.out_channels = 1280
     backbone = VoxelBackbone()
     backbone.out_channels = 1536
 
     anchor_generator = AnchorGenerator()
-
-    # roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-    #     featmap_names=['0'], output_size=7, sampling_ratio=2)
 
     # train on the GPU or on the CPU, if a GPU is not available
     device = torch.device(
@@ -55,7 +48,6 @@ def voxel_train():
 
     # get the model using our helper function
     model = VoxelRCNN(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
-                    #   box_roi_pool=roi_pooler)
 
     # move model to the right device
     model.to(device)
@@ -96,7 +88,3 @@ def voxel_train():
         evaluate(model, data_loader_test, device, epoch, writer=writer)
 
     writer.flush()
-
-
-if __name__ == '__main__':
-    voxel_train()
