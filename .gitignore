@@ -1,9 +1,7 @@
-__pycache__
-models/__pycache__
-modules/__pycache__
-utils/__pycache__
+**/__pycache__
 runs
 dataset/PennFudanPed
 dataset/nuScenesDataset
 dataset/ZadarLabsDataset
 configs
+display/data

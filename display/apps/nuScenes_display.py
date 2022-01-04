@@ -167,7 +167,7 @@ hdbscan_select = html.Div(
 
 sidebar = html.Div(
     [
-        html.H2("Clustering Options", className="display-5"),
+        html.H2("Clustering Options", className="display-5 fw-bold"),
         html.Hr(),
         html.P(
             "Select algorithm to display.", className="lead"
@@ -258,8 +258,8 @@ def render_content(window_location,
         dbscan_overlay = overlay(dbscan.labels_)
         content = html.Div([
             dcc.Graph(figure=dbscan_scatter),
-            dcc.Graph(figure=dbscan_overlay),
-            html.Br()
+            # dcc.Graph(figure=dbscan_overlay),
+            # html.Br()
         ])
         return dict(display="block"), content, dict(display="block"), dict(display="none"), \
             dict(display="none"), dict(
@@ -272,8 +272,8 @@ def render_content(window_location,
         optics_overlay = overlay(optics.labels_)
         content = html.Div([
             dcc.Graph(figure=optics_scatter),
-            dcc.Graph(figure=optics_overlay),
-            html.Br()
+            # dcc.Graph(figure=optics_overlay),
+            # html.Br()
         ])
         return dict(display="block"), content, dict(display="none"), dict(display="block"), \
             dict(display="none"), dict(
@@ -295,8 +295,8 @@ def render_content(window_location,
         gbdbscan_overlay = overlay(gbdbscan.labels_)
         content = html.Div([
             dcc.Graph(figure=gbdbscan_scatter),
-            dcc.Graph(figure=gbdbscan_overlay),
-            html.Br()
+            # dcc.Graph(figure=gbdbscan_overlay),
+            # html.Br()
         ])
         return dict(display="block"), content, dict(display="none"), dict(display="none"), \
             dict(display="block"), dict(
@@ -309,8 +309,8 @@ def render_content(window_location,
         hdbscan_overlay = overlay(hdbscan.labels_)
         content = html.Div([
             dcc.Graph(figure=hdbscan_scatter),
-            dcc.Graph(figure=hdbscan_overlay),
-            html.Br()
+            # dcc.Graph(figure=hdbscan_overlay),
+            # html.Br()
         ])
         return dict(display="block"), content, dict(display="none"), dict(display="none"), \
             dict(display="none"), dict(

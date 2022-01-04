@@ -9,6 +9,8 @@ from torch import tensor
 from configs.config import T
 
 import numpy as np
+import json
+import datetime
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, scaler=None, writer=None):
@@ -27,7 +29,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         # lr_scheduler = torch.optim.lr_scheduler.LinearLR(
         #     optimizer, start_factor=warmup_factor, total_iters=warmup_iters
         # )
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=warmup_iters, eta_min=0)
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer=optimizer, T_max=warmup_iters, eta_min=0)
 
     # print("Initial Metric Logger: ", metric_logger)
 
@@ -44,7 +47,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
                 processed_voxel_coords.append(tensor(np.vstack([np.array(voxel_coord), np.zeros(
                     (max_points - len(voxel_coord), 3))])).unsqueeze(0))
             else:
-                processed_voxel_features.append(tensor(voxel_feature).unsqueeze(0))
+                processed_voxel_features.append(
+                    tensor(voxel_feature).unsqueeze(0))
                 processed_voxel_coords.append(tensor(voxel_coord).unsqueeze(0))
         frames = torch.cat(processed_voxel_features).float().to(
             device), torch.cat(processed_voxel_coords).long().to(device)
@@ -57,6 +61,19 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
             loss_dict, detections = model(frames, targets)
             losses = sum(loss for loss in loss_dict.values())
         print("DETECTIONS: ", detections)
+
+        # TODO fix write to data.json
+        with open("display/data/" + str(datetime.datetime.now()) + ".json", "w") as f:
+            json_targets = [t.tensor_to_list() for t in targets]
+            json_detections = [[d.tolist() for d in detection]
+                               for detection in detections]
+            json_losses = [loss.clone().detach().tolist()
+                         for loss in loss_dict.values()]
+            print("JSON_TARGETS: ", json_targets)
+            print("JSON_DETECTIONS: ", json_detections)
+            print("JSON_LOSSES: ", json_losses)
+            json.dump(dict(targets=json_targets,
+                      detections=json_detections, losses=json_losses), f)
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)

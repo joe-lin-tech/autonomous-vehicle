@@ -12,7 +12,7 @@ from dataset.zadar_radar import ZadarLabsDataset
 import utils.voxel._utils as utils
 from utils.voxel.engine import train_one_epoch, evaluate
 from torchsummary import summary
-from modules.voxel_backbone import VoxelBackbone
+from model.modules.voxel_backbone import VoxelBackbone
 
 
 def voxel_train():

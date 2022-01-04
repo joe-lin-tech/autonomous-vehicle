@@ -27,7 +27,7 @@ def preprocess(radar_pc):
                                                     return_inverse=True, return_counts=True)
 
     voxel_features = []
-
+    
     for i in range(len(voxel_coords)):
         voxel = np.zeros((T, 7), dtype=np.float32)
         pts = radar_pc[inv_ind == i]
@@ -81,17 +81,12 @@ class ZadarLabsDataset(torch.utils.data.Dataset):
         # there is only one class
         labels = torch.as_tensor(labels, dtype=torch.int64)
 
-        frame_id = torch.tensor([idx])
+        # frame_id = torch.tensor([idx])
+        frame_id = torch.tensor([int(self.frames[idx])])
         volume = boxes[:, 3] * boxes[:, 4] * boxes[:, 5]
 
-        target = {}
-        target["boxes"] = boxes
-        target["labels"] = labels
-        target["frame_id"] = frame_id
-        target["volume"] = volume
-
-        target = VoxelTarget(boxes=target["boxes"], labels=target["labels"],
-                             frame_id=target["frame_id"], volume=target["volume"])
+        target = VoxelTarget(boxes=boxes, labels=labels,
+                             frame_id=frame_id, volume=volume)
 
         return pc_points, target
 
