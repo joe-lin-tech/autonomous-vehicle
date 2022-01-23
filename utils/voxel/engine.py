@@ -61,19 +61,19 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
             loss_dict, detections = model(frames, targets)
             losses = sum(loss for loss in loss_dict.values())
         print("DETECTIONS: ", detections)
+        detection_boxes, detection_scores = detections
 
         # TODO fix write to data.json
         with open("display/data/" + str(datetime.datetime.now()) + ".json", "w") as f:
             json_targets = [t.tensor_to_list() for t in targets]
-            json_detections = [[d.tolist() for d in detection]
-                               for detection in detections]
+            json_boxes = [[box.tolist() for box in boxes]
+                          for boxes in detection_boxes]
+            json_scores = [[score.tolist() for score in scores]
+                           for scores in detection_scores]
             json_losses = [loss.clone().detach().tolist()
-                         for loss in loss_dict.values()]
-            print("JSON_TARGETS: ", json_targets)
-            print("JSON_DETECTIONS: ", json_detections)
-            print("JSON_LOSSES: ", json_losses)
+                           for loss in loss_dict.values()]
             json.dump(dict(targets=json_targets,
-                      detections=json_detections, losses=json_losses), f)
+                      boxes=json_boxes, scores=json_scores, losses=json_losses), f)
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)

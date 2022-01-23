@@ -187,10 +187,12 @@ class RegionProposalNetwork(torch.nn.Module):
         self.block_2 = RPNBlock(2)
         self.block_3 = RPNBlock(3)
 
-        # self.deconv_1 = nn.Sequential(nn.ConvTranspose2d(
-        #     256, 256, 4, 4, 0), nn.BatchNorm2d(256))
+
         self.deconv_1 = nn.Sequential(nn.ConvTranspose2d(
-            256, 256, 4, 4, 1), nn.BatchNorm2d(256))
+            256, 256, 4, 4, 0), nn.BatchNorm2d(256))
+        # TODO revert to following line if VOXEL_D, VOXEL_W, VOXEL_H are 1, 2, 2
+        # self.deconv_1 = nn.Sequential(nn.ConvTranspose2d(
+        #     256, 256, 4, 4, 1), nn.BatchNorm2d(256))
         self.deconv_2 = nn.Sequential(nn.ConvTranspose2d(
             128, 256, 2, 2, 0), nn.BatchNorm2d(256))
         self.deconv_3 = nn.Sequential(nn.ConvTranspose2d(
@@ -287,8 +289,8 @@ class RegionProposalNetwork(torch.nn.Module):
             # boxes, scores, lvl = boxes[keep], scores[keep], lvl[keep]
             boxes, scores = boxes[keep], scores[keep]
 
-            # TODO change later
-            self.score_thresh = 0.57
+            # TODO change implementation later
+            self.score_thresh = 0.65
 
             # remove low scoring boxes
             # use >= for Backwards compatibility
@@ -296,7 +298,11 @@ class RegionProposalNetwork(torch.nn.Module):
             boxes, scores = boxes[keep], scores[keep]
 
             # non-maximum suppression, independently done per level
+            print("BOXES: ", boxes.shape)
+            print("SCORES: ", scores.shape)
+            print("NMS THRESH: ", self.nms_thresh)
             preserved_boxes, preserved_scores = box_ops.batched_nms(boxes, scores, self.nms_thresh)
+            print("PRESERVED SCORES: ", preserved_scores)
 
             # keep only topk scoring predictions
             boxes, scores = preserved_boxes[:self.post_nms_top_n()], preserved_scores[:self.post_nms_top_n()]
@@ -331,6 +337,10 @@ class RegionProposalNetwork(torch.nn.Module):
 
         # TODO check implementation
         pred_bbox_deltas = torch.flatten(torch.flatten(torch.flatten(pred_bbox_deltas, 2).transpose(1, 2), 2), 0, 1)
+        torch.set_printoptions(profile="full")
+        print("PRED BBOX DELTAS: ", pred_bbox_deltas[sampled_pos_inds])
+        print("REGRESSION TARGETS: ", regression_targets[sampled_pos_inds])
+        torch.set_printoptions(profile="default")
 
         box_loss = (
             F.smooth_l1_loss(
@@ -374,6 +384,7 @@ class RegionProposalNetwork(torch.nn.Module):
         deconv_1 = self.deconv_1(features)
         deconv_2 = self.deconv_2(features_level_2)
         deconv_3 = self.deconv_3(features_level_1)
+        print("DECONV SHAPES: ", deconv_1.shape, deconv_2.shape, deconv_3.shape)
         features = torch.cat((deconv_1, deconv_2, deconv_3), 1)
 
         # objectness [batch_size, num_anchors_per_location, D, W]
@@ -391,7 +402,7 @@ class RegionProposalNetwork(torch.nn.Module):
         proposals = self.box_coder.decode(pred_bbox_deltas.detach(), anchors)
 
         # TODO implement filtering proposals to output non-max suppressed bounding boxes
-        boxes, scores = self.filter_proposals(
+        detections = self.filter_proposals(
             proposals, objectness)
 
         losses = {}
@@ -407,5 +418,6 @@ class RegionProposalNetwork(torch.nn.Module):
                 "loss_objectness": loss_objectness,
                 "loss_rpn_box_reg": loss_rpn_box_reg,
             }
-        # return boxes, losses
-        return boxes, losses
+        
+
+        return detections, losses

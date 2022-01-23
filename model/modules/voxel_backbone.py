@@ -2,8 +2,9 @@ import torch
 from torch import nn, Tensor, tensor
 from torch.nn import functional as F
 from torchvision.ops import boxes as box_ops
+from model.modules.attention_block import SelfAttentionBlock
 
-from configs.config import T, D, W, H
+from configs.config import BATCH_SIZE, BEV_FEATURES, T, D, W, H, BACKBONE_OUT_CHANNELS, DROPOUT_RATE
 import numpy as np
 
 # 3D Convolution + Batch Normalization + Rectified Linear Unit
@@ -104,31 +105,82 @@ class VoxelBackbone(torch.nn.Module):
     def __init__(self):
         super(VoxelBackbone, self).__init__()
         self.svfe = StackedVFE()
+
+        # added attention phase initialization
+        self.dropout = nn.Dropout(p=DROPOUT_RATE)
+        self.layer_norm = nn.LayerNorm(BEV_FEATURES, eps=1e-6)
+
+        # Self-attention layers
+        self.attention_1 = SelfAttentionBlock(inplanes=BEV_FEATURES, planes=BEV_FEATURES)
+        self.attention_2 = SelfAttentionBlock(inplanes=BEV_FEATURES, planes=BEV_FEATURES)
+
         self.cml = ConvolutionalMiddleLayer()
 
+    # omit if not needed
     def voxel_indexing(self, sparse_features, coords):
         dim = sparse_features.shape[-1]
 
         # TODO change for variable batch_size (dim 1)
-        dense_feature = torch.zeros(2, dim, D, W, H)
+        # TODO check implementation (correct feature extraction in correct dimensions - d, w, h)
+        # dense_feature = torch.zeros(2, dim, D, W, H)
+
+        # d = coords[..., 0]
+        # w = coords[..., 1]
+        # h = coords[..., 2]
+
+        # dense_feature[0, :, d[0], w[0], h[0]] = sparse_features[0, ...].transpose(0, 1)
+        # dense_feature[1, :, d[1], w[1], h[1]] = sparse_features[1, ...].transpose(0, 1)
+        dense_feature = torch.zeros(BATCH_SIZE, dim, H, D, W)
 
         d = coords[..., 0]
         w = coords[..., 1]
         h = coords[..., 2]
 
-        dense_feature[0, :, d[0], w[0], h[0]] = sparse_features[0, ...].transpose(0, 1)
-        dense_feature[1, :, d[1], w[1], h[1]] = sparse_features[1, ...].transpose(0, 1)
-        # dense_feature.scatter_(1, coords, sparse_features)
+        for batch_idx in range(BATCH_SIZE):
+            dense_feature[batch_idx, :, h[batch_idx], d[batch_idx], w[batch_idx]] = sparse_features[batch_idx, ...].transpose(0, 1)
 
         return dense_feature
+    
+    def add_context_to_voxels(self, voxel_wise_features, voxel_coords):
+        sparse_features = []
+
+        for batch_idx in range(BATCH_SIZE):
+            voxel_pillars = voxel_wise_features[batch_idx].unsqueeze(0)
+            print("VOXEL_PILLARS: ", voxel_pillars.shape)
+            voxel_pillars = voxel_pillars.permute(0, 2, 1).contiguous()
+
+            voxel_pillars = self.attention_1(voxel_pillars)
+            voxel_pillars = self.attention_2(voxel_pillars)
+            voxel_pillars = voxel_pillars.permute(0, 2, 1).contiguous().squeeze(0)
+
+            sparse_features.append(voxel_pillars)
+
+        sparse_features = torch.stack(sparse_features, dim=0)
+        print("SPARSE_FEATURES: ", sparse_features.shape)
+        print("VOXEL_COORDS: ", voxel_coords.shape)
+        context_features = self.voxel_indexing(sparse_features, voxel_coords)
+        return context_features
 
     def forward(self, pointclouds):
         voxel_features, voxel_coords = pointclouds
         # feature learning network
-        vwfs = self.svfe(voxel_features)
-        vwfs = self.voxel_indexing(vwfs, voxel_coords)
+        voxel_wise_features = self.svfe(voxel_features)
+
+        # add back if necessary
+        # voxel_wise_features = self.voxel_indexing(voxel_wise_features, voxel_coords)
+
+        # added attention phase
+        print("PRE-DROPOUT: ", voxel_wise_features.shape)
+        voxel_wise_features = self.dropout(self.layer_norm(voxel_wise_features))
+        print("VOXEL_WISE_FEATURES: ", voxel_wise_features.shape)
+        print("VOXEL_COORDS: ", voxel_coords.shape)
+        context_features = self.add_context_to_voxels(voxel_wise_features, voxel_coords)
+        print("CONTEXTS: ", context_features.shape)
 
         # convolutional middle network
-        cml_out = self.cml(vwfs)
+        # cml_out = self.cml(voxel_wise_features)
+        print("BEFORE CML: ", context_features.shape)
+        cml_out = self.cml(context_features)
+        print("CML OUT: ", cml_out.shape)
 
         return cml_out.view(2, -1, D, W)

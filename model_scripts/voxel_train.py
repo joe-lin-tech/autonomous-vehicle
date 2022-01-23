@@ -3,7 +3,7 @@ from torch import nn, Tensor, tensor
 
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
-from model.voxel_rcnn import VoxelRCNN
+from model.voxel_attention import VoxelAttention
 from utils.voxel.anchor_utils import AnchorGenerator
 from data_types.target import Target
 import torch.optim as optim
@@ -47,7 +47,7 @@ def voxel_train():
         collate_fn=utils.collate_fn)
 
     # get the model using our helper function
-    model = VoxelRCNN(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
+    model = VoxelAttention(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
 
     # move model to the right device
     model.to(device)

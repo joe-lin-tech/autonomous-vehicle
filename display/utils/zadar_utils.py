@@ -109,8 +109,9 @@ def draw_box(scatter, box_corners):
         color="blue"
     )
 
-def draw_detection(scatter, detection_corners):
+def draw_detection(scatter, detection_corners, score):
     detection_corners = np.transpose(detection_corners)
+    print(score)
     scatter.add_mesh3d(
         x=detection_corners[:, 0],
         y=detection_corners[:, 1],
@@ -119,24 +120,27 @@ def draw_detection(scatter, detection_corners):
         j=[2, 5, 7, 3, 4, 0, 4, 3, 6, 7, 0, 2],
         k=[6, 1, 3, 2, 0, 1, 7, 7, 4, 4, 1, 0],
         opacity=0.1,
-        color="red"
+        # opacity=score[0],
+        color="red",
+        # name=str(score[0])
     )
 
 
 def get_layout_plots(targets, detections, losses):
     all_pc_scatters = []
-    for target, detection, loss in zip(targets, detections, losses):
-        boxes = target["boxes"]
+    boxes, scores = detections
+    for target, detection_boxes, detection_scores, loss in zip(targets, boxes, scores, losses):
+        target_boxes = target["boxes"]
         labels = target["labels"]
         frame_id = str(target["frame_id"][0])
         volume = target["volume"]
         pc_scatter = get_pointcloud_scatter(frame_id)
-        for b in boxes:
-            box_corners = box_to_corners(b)
+        for box in target_boxes:
+            box_corners = box_to_corners(box)
             draw_box(pc_scatter, box_corners)
-        for d in detection:
-            detection_corners = box_to_corners(d)
-            draw_detection(pc_scatter, detection_corners)
+        for box, score in zip(detection_boxes, detection_scores):
+            detection_corners = box_to_corners(box)
+            draw_detection(pc_scatter, detection_corners, score)
         all_pc_scatters.append(pc_scatter)
     return all_pc_scatters
 

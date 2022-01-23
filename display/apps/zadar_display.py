@@ -13,7 +13,7 @@ import json
 import numpy as np
 
 
-voxelrcnn_select = html.Div(
+voxel_attention_select = html.Div(
     children=[
         html.P("batch_size"),
         dcc.Slider(min=1, max=5, value=2, step=1,
@@ -21,8 +21,8 @@ voxelrcnn_select = html.Div(
                        1: {'label': '1'},
                        2: {'label': '2'},
                        5: {'label': '5'}
-                   }, id="voxelrcnn-batch-select"),
-    ], id="voxelrcnn-select", style=dict(display="none"))
+                   }, id="voxel-attention-batch-select"),
+    ], id="voxel-attention-select", style=dict(display="none"))
 
 voxelnet_select = html.Div(
     children=[
@@ -44,8 +44,8 @@ sidebar = html.Div(
         ),
         dbc.Nav(
             [
-                dbc.NavLink("VoxelRCNN", href="#voxelrcnn",
-                            id="voxelrcnn-nav", active=False),
+                dbc.NavLink("Voxel Attention", href="#voxelattention",
+                            id="voxel-attention-nav", active=False),
                 dbc.NavLink("VoxelNet", href="#voxelnet",
                             id="voxelnet-nav", active=False),
             ],
@@ -55,7 +55,7 @@ sidebar = html.Div(
         html.Div([
             html.Hr(),
             html.P("Select model parameters", className="lead"),
-            voxelrcnn_select,
+            voxel_attention_select,
             voxelnet_select,
             html.Hr(),
             dbc.Button("Start Training", id="train-button")
@@ -112,7 +112,7 @@ def update_layout(file):
     with open(os.path.join(os.getcwd(), "display/data/" + file), "r") as f:
         data = json.load(f)
         targets = data["targets"]
-        detections = data["detections"]
+        detections = data["boxes"], data["scores"]
         losses = data["losses"]
         pc_scatters = get_layout_plots(targets, detections, losses)
     pc_graphs = [dcc.Graph(figure=scatter) for scatter in pc_scatters]
@@ -123,9 +123,9 @@ def update_layout(file):
     Output("zadar-param-section", "style"),
     # Output("zadar-content", "children"),
     Output("zadar-graphs", "children"),
-    Output("voxelrcnn-select", "style"),
+    Output("voxel-attention-select", "style"),
     Output("voxelnet-select", "style"),
-    Output("voxelrcnn-nav", "active"),
+    Output("voxel-attention-nav", "active"),
     Output("voxelnet-nav", "active"),
     Input("window-location", "hash"),
     Input("train-button", "n_clicks"),
@@ -141,7 +141,7 @@ def render_content(window_location, train_button, graph_dropdown):
         pc_graphs = []
 
     # Set unsupervised algorithm content
-    if window_location == "#voxelrcnn":
+    if window_location == "#voxelattention":
         if train:
             print("TRAINING")
             voxel_train()

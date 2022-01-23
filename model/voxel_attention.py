@@ -11,16 +11,18 @@ import warnings
 
 from typing import List, Tuple, Optional
 from data_types.target import VoxelTarget
+import math
 
 
-class VoxelRCNN(nn.Module):
+class VoxelAttention(nn.Module):
     def __init__(self, backbone, num_classes=None,
                  # RPN parameters
                  rpn_anchor_generator=None, rpn_head=None,
                  rpn_pre_nms_top_n_train=2000, rpn_pre_nms_top_n_test=1000,
                  rpn_post_nms_top_n_train=2000, rpn_post_nms_top_n_test=1000,
                  rpn_nms_thresh=0.7,
-                 rpn_fg_iou_thresh=0.7, rpn_bg_iou_thresh=0.3,
+                 # originally fg: 0.7; bg: 0.3
+                 rpn_fg_iou_thresh=0.5, rpn_bg_iou_thresh=0.3,
                  rpn_batch_size_per_frame=256, rpn_positive_fraction=0.5,
                  rpn_score_thresh=0.0):
 
@@ -31,7 +33,6 @@ class VoxelRCNN(nn.Module):
                 "same for all the levels)")
 
         assert isinstance(rpn_anchor_generator, (AnchorGenerator, type(None)))
-        # assert isinstance(box_roi_pool, (MultiScaleRoIAlign, type(None)))
 
         if rpn_anchor_generator is None:
             rpn_anchor_generator = AnchorGenerator()
@@ -55,6 +56,7 @@ class VoxelRCNN(nn.Module):
         super().__init__()
         self.backbone = backbone
         self.rpn = rpn
+
         # used only on torchscript mode
         self._has_warned = False
 
@@ -98,20 +100,22 @@ class VoxelRCNN(nn.Module):
                     raise ValueError(
                         f"Expected target boxes to be of type Tensor, got {type(boxes)}.")
 
-        features = self.backbone(pointclouds)
+        voxel_encoding = self.backbone(pointclouds)
 
-        proposals, proposal_losses = self.rpn(features, targets)
+        detections, detection_losses = self.rpn(voxel_encoding, targets)
+
+        # detection_boxes, detection_scores = detections
 
         losses = {}
-        losses.update(proposal_losses)
+        losses.update(detection_losses)
 
         if torch.jit.is_scripting():
             if not self._has_warned:
                 warnings.warn(
-                    "RCNN always returns a (Losses, Detections) tuple in scripting")
+                    "VoxelAttention always returns a (Losses, Detections) tuple in scripting")
                 self._has_warned = True
             # return losses, detections
             return losses
         else:
             # return self.eager_outputs(losses, detections, write_graph=write_graph)
-            return self.eager_outputs(losses, proposals, write_graph=write_graph)
+            return self.eager_outputs(losses, detections, write_graph=write_graph)

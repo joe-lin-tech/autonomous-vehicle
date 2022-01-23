@@ -164,9 +164,8 @@ class BoxCoder:
         # proposals = torch.cat((proposals), dim=0)
         proposals = torch.flatten(torch.flatten(torch.flatten(proposals, 2).transpose(1, 2), 2), 0, 1)
         print("PROPOSALS: ", proposals, proposals.shape)
-        targets = self.encode_single(reference_boxes, proposals)
-        print("TARGETS: ", targets.shape, targets.split(boxes_per_frame, dim=0)[0].shape, targets.split(boxes_per_frame, dim=0)[1].shape)
-        return targets.split(boxes_per_frame, 0)
+        regression_targets = self.encode_single(reference_boxes, proposals)
+        return regression_targets.split(boxes_per_frame, 0)
 
     def encode_single(self, reference_boxes: Tensor, proposals: Tensor) -> Tensor:
         """
@@ -310,6 +309,7 @@ class Matcher:
                 for predictions that have only low-quality match candidates. See
                 set_low_quality_matches_ for more details.
         """
+
         self.BELOW_LOW_THRESHOLD = -1
         self.BETWEEN_THRESHOLDS = -2
         assert low_threshold <= high_threshold
@@ -338,10 +338,9 @@ class Matcher:
 
         # match_quality_matrix is M (gt) x N (predicted)
         # Max over gt elements (dim 0) to find best gt candidate for each prediction
-        print("MATCH_QUALITY_MATRIX SHAPE: ", match_quality_matrix.shape)
+
         matched_vals, matches = match_quality_matrix.max(dim=0)
-        print("MATCHED_VALS SHAPE: ", matched_vals.shape)
-        print("MATCHES SHAPE: ", matches.shape)
+
         if self.allow_low_quality_matches:
             all_matches = matches.clone()
         else:
@@ -352,14 +351,14 @@ class Matcher:
         between_thresholds = (matched_vals >= self.low_threshold) & (
             matched_vals < self.high_threshold)
         matches[below_low_threshold] = self.BELOW_LOW_THRESHOLD
-        print("MATCHES AFTER BELOW_LOW_THRESHOLD: ", matches.shape)
         matches[between_thresholds] = self.BETWEEN_THRESHOLDS
-        print("MATCHES AFTER BETWEEN_THRESHOLDS: ", matches.shape)
 
         if self.allow_low_quality_matches:
             assert all_matches is not None
             self.set_low_quality_matches_(
                 matches, all_matches, match_quality_matrix)
+
+        print("MATCHES: ", matches)
 
         return matches
 
@@ -373,6 +372,9 @@ class Matcher:
         """
         # For each gt, find the prediction with which it has highest quality
         highest_quality_foreach_gt, _ = match_quality_matrix.max(dim=1)
+        torch.set_printoptions(profile="full")
+        print("HIGHEST_QUALITY_FOREACH_GT: ", highest_quality_foreach_gt)
+        torch.set_printoptions(profile="default")
         # Find highest quality match available, even if it is low, including ties
         gt_pred_pairs_of_highest_quality = torch.where(
             match_quality_matrix == highest_quality_foreach_gt[:, None])

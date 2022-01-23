@@ -5,7 +5,7 @@ import torch
 from torch import nn, Tensor, tensor
 import numpy as np
 
-from configs.config import RANGE_X, RANGE_Y, RANGE_Z, VOXEL_D, VOXEL_W, VOXEL_H, D, W, H
+from configs.config import BATCH_SIZE, RANGE_X, RANGE_Y, RANGE_Z, VOXEL_D, VOXEL_W, VOXEL_H, D, W, H
 
 
 class AnchorGenerator(nn.Module):
@@ -60,6 +60,9 @@ class AnchorGenerator(nn.Module):
         # r[..., 1] = np.pi/2
         # anchors = np.stack([cx, cy, cz, h, w, l, r], axis=-1)
 
+        print("GENERATING ANCHORS X: ", RANGE_X[0] + VOXEL_D, RANGE_X[1] - VOXEL_D, D // 2)
+        print("GENERATING ANCHORS Y: ", RANGE_Y[0] + VOXEL_W, RANGE_Y[1] - VOXEL_W, W // 2)
+
         x = np.linspace(RANGE_X[0] + VOXEL_D, RANGE_X[1] - VOXEL_D, D // 2)
         y = np.linspace(RANGE_Y[0] + VOXEL_W, RANGE_Y[1] - VOXEL_W, W // 2)
 
@@ -71,9 +74,8 @@ class AnchorGenerator(nn.Module):
         # ys = np.tile(ys[..., np.newaxis], 2)
 
         # generating for multiple batches
-        batch_size = 2
-        xs = np.tile(xs[np.newaxis, ...], (batch_size, 1, 1))
-        ys = np.tile(ys[np.newaxis, ...], (batch_size, 1, 1))
+        xs = np.tile(xs[np.newaxis, ...], (BATCH_SIZE, 1, 1))
+        ys = np.tile(ys[np.newaxis, ...], (BATCH_SIZE, 1, 1))
         print("XS: ", xs.shape)
         print("YS: ", ys.shape)
 
@@ -85,15 +87,6 @@ class AnchorGenerator(nn.Module):
         yrots = np.ones_like(xs) * 0
         zrots = np.ones_like(xs) * 0
 
-        # xs = torch.as_tensor(xs, dtype=dtype).view(-1)
-        # ys = torch.as_tensor(ys, dtype=dtype).view(-1)
-        # zs = torch.as_tensor(zs, dtype=dtype).view(-1)
-        # ds = torch.as_tensor(ds, dtype=dtype).view(-1)
-        # ws = torch.as_tensor(ws, dtype=dtype).view(-1)
-        # hs = torch.as_tensor(hs, dtype=dtype).view(-1)
-        # xrots = torch.as_tensor(xrots, dtype=dtype).view(-1)
-        # yrots = torch.as_tensor(yrots, dtype=dtype).view(-1)
-        # zrots = torch.as_tensor(zrots, dtype=dtype).view(-1)
         xs = torch.as_tensor(xs, dtype=dtype)
         ys = torch.as_tensor(ys, dtype=dtype)
         zs = torch.as_tensor(zs, dtype=dtype)
