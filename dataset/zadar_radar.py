@@ -1,16 +1,14 @@
 import os
 import numpy as np
 import torch
-from PIL import Image
 from data_types.target import VoxelTarget
 from data_types.labels import LabelTypes
 import csv
-from pypcd import pypcd
 import json
 from configs.config import T, VOXEL_D, VOXEL_W, VOXEL_H, RANGE_X, RANGE_Y, RANGE_Z
 
 
-def preprocess(radar_pc):
+def preprocess_points(radar_pc):
     # shuffling the points
     np.random.shuffle(radar_pc)
 
@@ -44,27 +42,19 @@ def preprocess(radar_pc):
 
 class ZadarLabsDataset(torch.utils.data.Dataset):
     def __init__(self):
-        # load all image files, sorting them to
-        # ensure that they are aligned
         self.scene = "zadar_zsignal_dataset_1car_1bicycle_1human/segment-1"
         self.frames = list(sorted(os.listdir(os.path.join(
             os.getcwd(), "dataset/ZadarLabsDataset", self.scene))))[:-1]
 
     def __getitem__(self, idx):
-        # load pointcloud information
         pc_path = os.path.join(
             os.getcwd(), "dataset/ZadarLabsDataset", self.scene, self.frames[idx], "zsignal0_zvue.csv")
         pc_points = []
-
-        # retrieve pointcloud points from csv
         with open(pc_path, 'r') as f:
             reader = csv.reader(f, delimiter=',')
             header = next(reader)
             for row in reader:
                 pc_points.append(list(map(float, row)))
-
-        # retrieve raw pointcloud
-        # pc = pypcd.PointCloud.from_path(pc_path)
 
         gt_path = os.path.join(
             os.getcwd(), "dataset/ZadarLabsDataset", self.scene, self.frames[idx], "gtruth_labels.json")
@@ -74,7 +64,8 @@ class ZadarLabsDataset(torch.utils.data.Dataset):
             labels = [
                 LabelTypes[label.upper()].value for label in gt_json["labels"]]
 
-        pc_points = preprocess(pc_points)
+        # pc_points = preprocess(pc_points)
+        pc_points = torch.as_tensor(pc_points, dtype=torch.float32)
 
         # convert everything into a torch.Tensor
         boxes = torch.as_tensor(radar_cuboids, dtype=torch.float32)

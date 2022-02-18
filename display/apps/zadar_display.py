@@ -13,7 +13,7 @@ import json
 import numpy as np
 
 
-voxel_attention_select = html.Div(
+voxel_transformer_select = html.Div(
     children=[
         html.P("batch_size"),
         dcc.Slider(min=1, max=5, value=2, step=1,
@@ -21,8 +21,8 @@ voxel_attention_select = html.Div(
                        1: {'label': '1'},
                        2: {'label': '2'},
                        5: {'label': '5'}
-                   }, id="voxel-attention-batch-select"),
-    ], id="voxel-attention-select", style=dict(display="none"))
+                   }, id="voxel-transformer-batch-select"),
+    ], id="voxel-transformer-select", style=dict(display="none"))
 
 voxelnet_select = html.Div(
     children=[
@@ -44,8 +44,8 @@ sidebar = html.Div(
         ),
         dbc.Nav(
             [
-                dbc.NavLink("Voxel Attention", href="#voxelattention",
-                            id="voxel-attention-nav", active=False),
+                dbc.NavLink("Voxel Transformer", href="#voxeltransformer",
+                            id="voxel-transformer-nav", active=False),
                 dbc.NavLink("VoxelNet", href="#voxelnet",
                             id="voxelnet-nav", active=False),
             ],
@@ -55,7 +55,7 @@ sidebar = html.Div(
         html.Div([
             html.Hr(),
             html.P("Select model parameters", className="lead"),
-            voxel_attention_select,
+            voxel_transformer_select,
             voxelnet_select,
             html.Hr(),
             dbc.Button("Start Training", id="train-button")
@@ -123,9 +123,9 @@ def update_layout(file):
     Output("zadar-param-section", "style"),
     # Output("zadar-content", "children"),
     Output("zadar-graphs", "children"),
-    Output("voxel-attention-select", "style"),
+    Output("voxel-transformer-select", "style"),
     Output("voxelnet-select", "style"),
-    Output("voxel-attention-nav", "active"),
+    Output("voxel-transformer-nav", "active"),
     Output("voxelnet-nav", "active"),
     Input("window-location", "hash"),
     Input("train-button", "n_clicks"),
@@ -141,7 +141,7 @@ def render_content(window_location, train_button, graph_dropdown):
         pc_graphs = []
 
     # Set unsupervised algorithm content
-    if window_location == "#voxelattention":
+    if window_location == "#voxeltransformer":
         if train:
             print("TRAINING")
             voxel_train()

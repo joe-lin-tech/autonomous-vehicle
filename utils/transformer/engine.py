@@ -1,9 +1,12 @@
+# TODO rewrite file
+
 import math
 import sys
 import time
+from py import process
 
 import torch
-import utils.voxel._utils as utils
+import utils.transformer._utils as utils
 from data_types.target import VoxelTarget
 from torch import tensor
 from configs.config import T
@@ -35,29 +38,43 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
     # print("Initial Metric Logger: ", metric_logger)
 
     for frames, targets in metric_logger.log_every(data_loader, print_freq, header):
-        voxel_features = [frame[0] for frame in frames]
-        voxel_coords = [frame[1] for frame in frames]
-        max_points = max(list(map(len, voxel_features)))
+        voxel_features = [frame for frame in frames]
         processed_voxel_features = []
-        processed_voxel_coords = []
-        for voxel_feature, voxel_coord in zip(voxel_features, voxel_coords):
-            if len(voxel_feature) < max_points:
-                processed_voxel_features.append(tensor(np.vstack([np.array(
-                    voxel_feature), np.zeros((max_points - len(voxel_feature), T, 7))])).unsqueeze(0))
-                processed_voxel_coords.append(tensor(np.vstack([np.array(voxel_coord), np.zeros(
-                    (max_points - len(voxel_coord), 3))])).unsqueeze(0))
+        for i in range(len(voxel_features)):
+            print("VOXEL FEATURES LENGTH: ", len(voxel_features[i]))
+            if len(voxel_features[i]) < 128:
+                print("LESS THAN 128")
+                print(tensor(np.vstack([np.array(voxel_features[i]), np.zeros((128 - len(voxel_features[i]), 7))])).unsqueeze(0).shape)
+                processed_voxel_features.append(tensor(np.vstack([np.array(voxel_features[i]), np.zeros((128 - len(voxel_features[i]), 7))])).unsqueeze(0))
             else:
-                processed_voxel_features.append(
-                    tensor(voxel_feature).unsqueeze(0))
-                processed_voxel_coords.append(tensor(voxel_coord).unsqueeze(0))
-        frames = torch.cat(processed_voxel_features).float().to(
-            device), torch.cat(processed_voxel_coords).long().to(device)
+                print("GREATER THAN OR EQUAL TO 128")
+                print(tensor(np.array(voxel_features[i][:128])).unsqueeze(0).shape)
+                processed_voxel_features.append(tensor(np.array(voxel_features[i][:128])).unsqueeze(0))
+        print("PROCESSED VOXEL FEATURES: ", len(processed_voxel_features), len(processed_voxel_features[0]), len(processed_voxel_features[1]))
+        # voxel_coords = [frame[1] for frame in frames]
+        # max_points = max(list(map(len, voxel_features)))
+        # processed_voxel_features = []
+        # processed_voxel_coords = []
+        # for voxel_feature, voxel_coord in zip(voxel_features, voxel_coords):
+        #     if len(voxel_feature) < max_points:
+        #         processed_voxel_features.append(tensor(np.vstack([np.array(
+        #             voxel_feature), np.zeros((max_points - len(voxel_feature), T, 7))])).unsqueeze(0))
+        #         processed_voxel_coords.append(tensor(np.vstack([np.array(voxel_coord), np.zeros(
+        #             (max_points - len(voxel_coord), 3))])).unsqueeze(0))
+        #     else:
+        #         processed_voxel_features.append(
+        #             tensor(voxel_feature).unsqueeze(0))
+        #         processed_voxel_coords.append(tensor(voxel_coord).unsqueeze(0))
+        # frames = torch.cat(processed_voxel_features).float().to(
+        #     device), torch.cat(processed_voxel_coords).long().to(device)
+        frames = torch.cat(processed_voxel_features).float().to(device)
         print("TARGETS: ", len(targets))
         targets = [{k: v.to(device) for k, v in t._asdict().items()}
                    for t in targets]
         targets = [VoxelTarget(boxes=t["boxes"], labels=t["labels"],
                                frame_id=t["frame_id"], volume=t["volume"]) for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
+            print("FRAMES: ", frames.shape)
             loss_dict, detections = model(frames, targets)
             losses = sum(loss for loss in loss_dict.values())
         print("DETECTIONS: ", detections)

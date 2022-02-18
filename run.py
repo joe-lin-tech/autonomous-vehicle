@@ -1,5 +1,5 @@
 from model_scripts.voxel_train import voxel_train
-from display.index import display_app
+# from display.index import display_app
 
 def run():
     voxel_train()

@@ -1,26 +1,15 @@
-import torch
-from torch import nn, Tensor, tensor
+# TODO Rewrite File
 
-import torchvision
+import torch
 from torch.utils.tensorboard import SummaryWriter
-from model.voxel_attention import VoxelAttention
-from utils.voxel.anchor_utils import AnchorGenerator
-from data_types.target import Target
-import torch.optim as optim
-# from dataset.nuScenes_radar import nuScenesDataset 
+from model.voxel_transformer import VoxelTransformer
 from dataset.zadar_radar import ZadarLabsDataset
-import utils.voxel._utils as utils
-from utils.voxel.engine import train_one_epoch, evaluate
-from torchsummary import summary
-from model.modules.voxel_backbone import VoxelBackbone
+from utils.transformer.engine import train_one_epoch, evaluate
+import utils.transformer._utils as utils
 
 
 def voxel_train():
     writer = SummaryWriter()
-    backbone = VoxelBackbone()
-    backbone.out_channels = 1536
-
-    anchor_generator = AnchorGenerator()
 
     # train on the GPU or on the CPU, if a GPU is not available
     device = torch.device(
@@ -46,8 +35,11 @@ def voxel_train():
         dataset_test, batch_size=1, shuffle=False, num_workers=1,
         collate_fn=utils.collate_fn)
 
+    print("LOADED DATA...")
+
     # get the model using our helper function
-    model = VoxelAttention(backbone=backbone, num_classes=num_classes, rpn_anchor_generator=anchor_generator)
+    model = VoxelTransformer()
+    print("CREATED VOXEL TRANSFORMER...")
 
     # move model to the right device
     model.to(device)
@@ -80,6 +72,7 @@ def voxel_train():
 
     for epoch in range(num_epochs):
         # train for one epoch, # printing every 10 iterations
+        print("START TRAINING...")
         train_one_epoch(model, optimizer, data_loader,
                         device, epoch, print_freq=10, writer=writer)
         # update the learning rate
