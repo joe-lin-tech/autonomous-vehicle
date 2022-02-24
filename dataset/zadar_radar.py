@@ -54,7 +54,7 @@ class ZadarLabsDataset(torch.utils.data.Dataset):
             reader = csv.reader(f, delimiter=',')
             header = next(reader)
             for row in reader:
-                pc_points.append(list(map(float, row)))
+                pc_points.append(list(map(float, row[:5])))
 
         gt_path = os.path.join(
             os.getcwd(), "dataset/ZadarLabsDataset", self.scene, self.frames[idx], "gtruth_labels.json")

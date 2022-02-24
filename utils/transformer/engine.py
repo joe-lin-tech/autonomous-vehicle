@@ -1,20 +1,46 @@
+import utils.transformer._utils as utils
+
+def train_one_epochs(model, optimizer, data_loader, device, epoch, print_freq, scaler=None, writer=None):
+    model.train()
+    metric_logger = utils.MetricLogger(delimiter="  ", writer=writer)
+    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    header = 'Epoch: [{}]'.format(epoch)
+
+    lr_scheduler = None
+    if epoch == 0:
+        warmup_factor = 1.0 / 1000
+        warmup_iters = min(1000, len(data_loader) - 1)
+
+        # TODO convert back when upgrading torch to 1.10.0
+        # lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+        #     optimizer, start_factor=warmup_factor, total_iters=warmup_iters
+        # )
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer=optimizer, T_max=warmup_iters, eta_min=0)
+
+    for pointclouds, targets in metric_logger.log_every(data_loader, print_freq, header):
+        processed_pointclouds = []
+        for pc in list(pointclouds):
+            if len(pc) < 128:
+                processed_pointclouds.append(torch.vstack([pc, torch.zeros((128 - len(pc), 5))]).unsqueeze(0))
+            else:
+                processed_pointclouds.append(torch.unsqueeze(pc[:128], 0))
+
+        pointclouds = torch.cat(processed_pointclouds, dim=0)
+
 # TODO rewrite file
 
-import math
-import sys
-import time
-from py import process
 
-import torch
-import utils.transformer._utils as utils
-from data_types.target import VoxelTarget
-from torch import tensor
-from configs.config import T
 
 import numpy as np
-import json
-import datetime
-
+from configs.config import T
+from torch import tensor
+from data_types.target import VoxelTarget
+import utils.transformer._utils as utils
+import torch
+import time
+import sys
+import math
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, scaler=None, writer=None):
     model.train()
@@ -41,16 +67,12 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         voxel_features = [frame for frame in frames]
         processed_voxel_features = []
         for i in range(len(voxel_features)):
-            print("VOXEL FEATURES LENGTH: ", len(voxel_features[i]))
             if len(voxel_features[i]) < 128:
-                print("LESS THAN 128")
-                print(tensor(np.vstack([np.array(voxel_features[i]), np.zeros((128 - len(voxel_features[i]), 7))])).unsqueeze(0).shape)
-                processed_voxel_features.append(tensor(np.vstack([np.array(voxel_features[i]), np.zeros((128 - len(voxel_features[i]), 7))])).unsqueeze(0))
+                processed_voxel_features.append(tensor(np.vstack([np.array(
+                    voxel_features[i]), np.zeros((128 - len(voxel_features[i]), 5))])).unsqueeze(0))
             else:
-                print("GREATER THAN OR EQUAL TO 128")
-                print(tensor(np.array(voxel_features[i][:128])).unsqueeze(0).shape)
-                processed_voxel_features.append(tensor(np.array(voxel_features[i][:128])).unsqueeze(0))
-        print("PROCESSED VOXEL FEATURES: ", len(processed_voxel_features), len(processed_voxel_features[0]), len(processed_voxel_features[1]))
+                processed_voxel_features.append(
+                    tensor(np.array(voxel_features[i][:128])).unsqueeze(0))
         # voxel_coords = [frame[1] for frame in frames]
         # max_points = max(list(map(len, voxel_features)))
         # processed_voxel_features = []
@@ -68,33 +90,34 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         # frames = torch.cat(processed_voxel_features).float().to(
         #     device), torch.cat(processed_voxel_coords).long().to(device)
         frames = torch.cat(processed_voxel_features).float().to(device)
-        print("TARGETS: ", len(targets))
         targets = [{k: v.to(device) for k, v in t._asdict().items()}
                    for t in targets]
         targets = [VoxelTarget(boxes=t["boxes"], labels=t["labels"],
                                frame_id=t["frame_id"], volume=t["volume"]) for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            print("FRAMES: ", frames.shape)
-            loss_dict, detections = model(frames, targets)
+            # TODO remove when done
+            targets = [t.boxes for t in targets]
+            detections, loss_dict = model(frames, targets)
             losses = sum(loss for loss in loss_dict.values())
-        print("DETECTIONS: ", detections)
         detection_boxes, detection_scores = detections
+        print("CONVERTED DETECTIONS...")
 
         # TODO fix write to data.json
-        with open("display/data/" + str(datetime.datetime.now()) + ".json", "w") as f:
-            json_targets = [t.tensor_to_list() for t in targets]
-            json_boxes = [[box.tolist() for box in boxes]
-                          for boxes in detection_boxes]
-            json_scores = [[score.tolist() for score in scores]
-                           for scores in detection_scores]
-            json_losses = [loss.clone().detach().tolist()
-                           for loss in loss_dict.values()]
-            json.dump(dict(targets=json_targets,
-                      boxes=json_boxes, scores=json_scores, losses=json_losses), f)
+        # with open("display/data/" + str(datetime.datetime.now()) + ".json", "w") as f:
+        #     json_targets = [t.tensor_to_list() for t in targets]
+        #     json_boxes = [[box.tolist() for box in boxes]
+        #                   for boxes in detection_boxes]
+        #     json_scores = [[score.tolist() for score in scores]
+        #                    for scores in detection_scores]
+        #     json_losses = [loss.clone().detach().tolist()
+        #                    for loss in loss_dict.values()]
+        #     json.dump(dict(targets=json_targets,
+        #               boxes=json_boxes, scores=json_scores, losses=json_losses), f)
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+        print("REDUCED LOSSES...")
 
         loss_value = losses_reduced.item()
 
@@ -102,14 +125,16 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
             # print(f"Loss is {loss_value}, stopping training")
             # print(loss_dict_reduced)
             sys.exit(1)
-
+        print("START OPTIMIZER")
         optimizer.zero_grad()
         if scaler is not None:
             scaler.scale(losses).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
+            print("START BACKWARD")
             losses.backward()
+            print("FINISH BACKWARD")
             optimizer.step()
 
         if lr_scheduler is not None:

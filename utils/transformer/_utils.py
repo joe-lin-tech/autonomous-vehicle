@@ -5,6 +5,7 @@ import torch.distributed as dist
 from collections import defaultdict, deque
 import time
 import datetime
+from configs.config import BATCH_SIZE, D, W
 
 
 class BoxCoder:
@@ -24,31 +25,32 @@ class BoxCoder:
         Returns:
             Tensor: encoded boxes
         """
-        num_boxes_per_frame = [b.shape[0] for b in reference_boxes]
+        num_boxes_per_frame = [D * W // 4 for _ in range(BATCH_SIZE)]
         reference_boxes = torch.cat((reference_boxes), dim=0)
-        proposals = torch.cat((proposals), dim=0)
+        proposals = torch.flatten(torch.transpose(torch.flatten(
+            proposals, start_dim=2), 1, 2), start_dim=0, end_dim=1)
 
         wx, wy, wz, wd, ww, wh, wx_rot, wy_rot, wz_rot = self.weights
 
-        proposals_x = torch.unsqueeze(proposals[:, 0], 1)
-        proposals_y = torch.unsqueeze(proposals[:, 1], 1)
-        proposals_z = torch.unsqueeze(proposals[:, 2], 1)
-        proposals_d = torch.unsqueeze(proposals[:, 3], 1)
-        proposals_w = torch.unsqueeze(proposals[:, 4], 1)
-        proposals_h = torch.unsqueeze(proposals[:, 5], 1)
-        proposals_x_rot = torch.unsqueeze(proposals[:, 6], 1)
-        proposals_y_rot = torch.unsqueeze(proposals[:, 7], 1)
-        proposals_z_rot = torch.unsqueeze(proposals[:, 8], 1)
+        proposals_x = proposals[:, 0]
+        proposals_y = proposals[:, 1]
+        proposals_z = proposals[:, 2]
+        proposals_d = proposals[:, 3]
+        proposals_w = proposals[:, 4]
+        proposals_h = proposals[:, 5]
+        proposals_x_rot = proposals[:, 6]
+        proposals_y_rot = proposals[:, 7]
+        proposals_z_rot = proposals[:, 8]
 
-        reference_boxes_x = torch.unsqueeze(reference_boxes[:, 0], 1)
-        reference_boxes_y = torch.unsqueeze(reference_boxes[:, 1], 1)
-        reference_boxes_z = torch.unsqueeze(reference_boxes[:, 2], 1)
-        reference_boxes_d = torch.unsqueeze(reference_boxes[:, 3], 1)
-        reference_boxes_w = torch.unsqueeze(reference_boxes[:, 4], 1)
-        reference_boxes_h = torch.unsqueeze(reference_boxes[:, 5], 1)
-        reference_boxes_x_rot = torch.unsqueeze(reference_boxes[:, 6], 1)
-        reference_boxes_y_rot = torch.unsqueeze(reference_boxes[:, 7], 1)
-        reference_boxes_z_rot = torch.unsqueeze(reference_boxes[:, 8], 1)
+        reference_boxes_x = reference_boxes[:, 0]
+        reference_boxes_y = reference_boxes[:, 1]
+        reference_boxes_z = reference_boxes[:, 2]
+        reference_boxes_d = reference_boxes[:, 3]
+        reference_boxes_w = reference_boxes[:, 4]
+        reference_boxes_h = reference_boxes[:, 5]
+        reference_boxes_x_rot = reference_boxes[:, 6]
+        reference_boxes_y_rot = reference_boxes[:, 7]
+        reference_boxes_z_rot = reference_boxes[:, 8]
 
         diagonal = torch.sqrt(proposals_d ** 2 + proposals_w ** 2)
         targets_dx = wx * (reference_boxes_x - proposals_x) / diagonal
@@ -61,7 +63,7 @@ class BoxCoder:
         targets_dy_rot = wy_rot * (reference_boxes_y_rot - proposals_y_rot)
         targets_dz_rot = wz_rot * (reference_boxes_z_rot - proposals_z_rot)
 
-        targets = torch.cat(
+        targets = torch.stack(
             (targets_dx, targets_dy, targets_dz, targets_dd, targets_dw, targets_dh, targets_dx_rot, targets_dy_rot, targets_dz_rot), dim=1)
         return torch.split(targets, num_boxes_per_frame, dim=0)
 
@@ -76,21 +78,23 @@ class BoxCoder:
         Returns:
             Tensor: decoded boxes
         """
-        num_boxes_per_frame = [b.shape[0] for b in anchor_boxes]
-        rel_codes = torch.cat((rel_codes), dim=0)
-        anchor_boxes = torch.cat((anchor_boxes), dim=0)
+        num_boxes_per_frame = [D * W // 4 for _ in range(BATCH_SIZE)]
+        rel_codes = torch.flatten(torch.transpose(torch.flatten(
+            rel_codes, start_dim=2), 1, 2), start_dim=0, end_dim=1)
+        anchor_boxes = torch.flatten(torch.transpose(torch.flatten(
+            anchor_boxes, start_dim=2), 1, 2), start_dim=0, end_dim=1)
 
         wx, wy, wz, wd, ww, wh, wxrot, wyrot, wzrot = self.weights
 
-        anchor_boxes_x = torch.unsqueeze(anchor_boxes[:, 0], 1)
-        anchor_boxes_y = torch.unsqueeze(anchor_boxes[:, 1], 1)
-        anchor_boxes_z = torch.unsqueeze(anchor_boxes[:, 2], 1)
-        anchor_boxes_d = torch.unsqueeze(anchor_boxes[:, 3], 1)
-        anchor_boxes_w = torch.unsqueeze(anchor_boxes[:, 4], 1)
-        anchor_boxes_h = torch.unsqueeze(anchor_boxes[:, 5], 1)
-        anchor_boxes_x_rot = torch.unsqueeze(anchor_boxes[:, 6], 1)
-        anchor_boxes_y_rot = torch.unsqueeze(anchor_boxes[:, 7], 1)
-        anchor_boxes_z_rot = torch.unsqueeze(anchor_boxes[:, 8], 1)
+        anchor_boxes_x = anchor_boxes[:, 0]
+        anchor_boxes_y = anchor_boxes[:, 1]
+        anchor_boxes_z = anchor_boxes[:, 2]
+        anchor_boxes_d = anchor_boxes[:, 3]
+        anchor_boxes_w = anchor_boxes[:, 4]
+        anchor_boxes_h = anchor_boxes[:, 5]
+        anchor_boxes_x_rot = anchor_boxes[:, 6]
+        anchor_boxes_y_rot = anchor_boxes[:, 7]
+        anchor_boxes_z_rot = anchor_boxes[:, 8]
 
         rel_codes_dx = rel_codes[:, 0] / wx
         rel_codes_dy = rel_codes[:, 1] / wy
